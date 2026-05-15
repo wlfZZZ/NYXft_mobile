@@ -1,0 +1,536 @@
+{% extends "client/base_portal.html" %}
+
+{% block title %}Workout Ecosystem | NYXFT{% endblock %}
+
+{% block extra_css %}
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800;900&display=swap" rel="stylesheet">
+<style>
+    :root {
+        --accent-blue: #007AFF;
+        --accent-red: #FF453A;
+        --text-main: #000000;
+        --text-dim: #8E8E93;
+        --bg-primary: #FFFFFF;
+        --bg-subtle: #F2F2F7;
+        --border-light: rgba(0,0,0,0.05);
+        --card-radius: 28px;
+        --btn-radius: 18px;
+        --safe-bottom: 100px;
+    }
+
+    body { 
+        background-color: var(--bg-primary); 
+        color: var(--text-main);
+        font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+        -webkit-font-smoothing: antialiased;
+    }
+
+    .workout-container {
+        padding: 220px 20px var(--safe-bottom) 20px;
+        max-width: 600px;
+        margin: 0 auto;
+    }
+
+    /* ════ PREMIUM HEADER ════ */
+    .mobile-workout-header {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        background: rgba(255, 255, 255, 0.9);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        z-index: 1000;
+        padding: 24px 20px 0 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+    }
+
+    .header-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .header-title {
+        font-size: 1.6rem;
+        font-weight: 900;
+        letter-spacing: -0.5px;
+        margin: 0;
+    }
+
+    .btn-build {
+        background: #000;
+        color: #fff;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 100px;
+        font-size: 0.65rem;
+        font-weight: 800;
+        letter-spacing: 1px;
+        cursor: pointer;
+    }
+
+    /* Stats Cards */
+    .header-stats {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+    }
+
+    .h-stat {
+        background: var(--bg-subtle);
+        padding: 15px 18px;
+        border-radius: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .h-stat-label { 
+        font-size: 0.55rem; 
+        font-weight: 700; 
+        color: var(--text-dim); 
+        text-transform: uppercase; 
+        letter-spacing: 0.5px; 
+    }
+    .h-stat-val { 
+        font-size: 0.95rem; 
+        font-weight: 800; 
+    }
+
+    /* Tab Navigation */
+    .system-nav {
+        display: flex;
+        gap: 30px;
+        overflow-x: auto;
+        scrollbar-width: none;
+        padding-bottom: 12px;
+    }
+    .system-nav::-webkit-scrollbar { display: none; }
+
+    .nav-tab {
+        font-size: 0.75rem;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: #C7C7CC;
+        padding-bottom: 12px;
+        white-space: nowrap;
+        position: relative;
+        transition: color 0.3s ease;
+    }
+    .nav-tab.active { color: var(--text-main); }
+    .nav-tab.active::after {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        height: 3px;
+        background: var(--text-main);
+        border-radius: 2px;
+    }
+
+    /* ════ WORKOUT CARDS ════ */
+    .module-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 25px;
+    }
+
+    .system-card {
+        background: #fff;
+        padding: 30px;
+        border-radius: var(--card-radius);
+        box-shadow: 0 10px 30px rgba(0,0,0,0.03);
+        border: 1px solid var(--border-light);
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .card-label { 
+        font-size: 0.6rem; 
+        font-weight: 900; 
+        color: var(--accent-blue); 
+        letter-spacing: 1.2px;
+        text-transform: uppercase;
+    }
+    .card-title { 
+        font-size: 2rem; 
+        font-weight: 900; 
+        letter-spacing: -0.5px;
+        margin: 5px 0;
+    }
+    .card-meta { 
+        color: var(--text-dim); 
+        font-size: 0.9rem; 
+        line-height: 1.5; 
+        font-weight: 500;
+        margin-bottom: 15px;
+    }
+
+    .card-actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 15px;
+        margin-top: 10px;
+    }
+
+    .btn-card {
+        height: 56px;
+        border-radius: 22px;
+        font-weight: 800;
+        font-size: 0.8rem;
+        border: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        cursor: pointer;
+        transition: transform 0.2s ease;
+    }
+    .btn-card:active { transform: scale(0.97); }
+
+    .btn-card.secondary { 
+        background: var(--bg-subtle); 
+        color: var(--text-main); 
+    }
+    .btn-card.primary { 
+        background: #000; 
+        color: #fff; 
+    }
+
+    .btn-card i { font-size: 1.2rem; }
+
+    /* Builder View */
+    .builder-pane { padding: 20px 0; }
+    .builder-input {
+        width: 100%;
+        padding: 20px;
+        background: var(--bg-subtle);
+        border: none;
+        border-radius: 20px;
+        font-size: 1.1rem;
+        font-weight: 700;
+        margin-bottom: 20px;
+        outline: none;
+    }
+
+    /* Execution HUD */
+    .session-hud {
+        position: fixed;
+        inset: 0;
+        background: #fff;
+        z-index: 2000;
+        display: none;
+        flex-direction: column;
+        padding: 60px 30px;
+    }
+
+    .large-display { 
+        font-size: 3.5rem; 
+        font-weight: 900; 
+        letter-spacing: -2px; 
+        margin: 20px 0;
+        text-align: center;
+    }
+
+    .hud-inputs {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 15px;
+        margin-top: 40px;
+    }
+
+    .input-box {
+        background: var(--bg-subtle);
+        padding: 15px;
+        border-radius: 20px;
+        text-align: center;
+    }
+    .input-box label { 
+        display: block;
+        font-size: 0.6rem; 
+        font-weight: 800; 
+        color: var(--text-dim); 
+        text-transform: uppercase;
+        margin-bottom: 5px;
+    }
+    .input-box input {
+        width: 100%;
+        background: transparent;
+        border: none;
+        font-size: 1.5rem;
+        font-weight: 900;
+        text-align: center;
+        outline: none;
+    }
+
+    @media (min-width: 1025px) {
+        .workout-container { max-width: 800px; padding-top: 180px; }
+    }
+
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- MOBILE STICKY HEADER -->
+<div class="mobile-workout-header">
+    <div class="header-top">
+        <h1 class="header-title">Workout Ecosystem</h1>
+        <button class="btn-build" onclick="switchView('custom')">+ BUILD</button>
+    </div>
+
+    <div class="header-stats">
+        <div class="h-stat">
+            <span class="h-stat-label">TOTAL VOLUME</span>
+            <span class="h-stat-val">42,500 kg</span>
+        </div>
+        <div class="h-stat">
+            <span class="h-stat-label">ACTIVE PLAN</span>
+            <span class="h-stat-val">Alpha PPL</span>
+        </div>
+    </div>
+
+    <nav class="system-nav">
+        <div class="nav-tab active" data-view="ppl" onclick="switchView('ppl')">PPL</div>
+        <div class="nav-tab" data-view="coach" onclick="switchView('coach')">PROTOCOLS</div>
+        <div class="nav-tab" data-view="custom" onclick="switchView('custom')">ARCHITECT</div>
+        <div class="nav-tab" data-view="smart" onclick="switchView('smart')">SMART / AI</div>
+    </nav>
+</div>
+
+<div class="workout-container">
+    <div id="moduleStage">
+        <!-- Dynamically Rendered -->
+    </div>
+</div>
+
+<!-- EXECUTION HUD -->
+<div class="session-hud" id="sessionHUD">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <span style="font-weight: 900; font-size: 0.7rem; letter-spacing: 1px;">NYXFT // SESSION</span>
+        <span id="hudTimer" style="font-weight: 900; font-size: 1.2rem;">00:00</span>
+    </div>
+
+    <div style="flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center;">
+        <span id="hudExLabel" style="font-size: 0.7rem; font-weight: 900; color: var(--accent-blue); letter-spacing: 2px;">SET 1 OF 4</span>
+        <h2 id="hudExName" class="large-display">BENCH PRESS</h2>
+        
+        <div class="hud-inputs">
+            <div class="input-box">
+                <label>Weight</label>
+                <input type="number" id="inWeight" value="60">
+            </div>
+            <div class="input-box">
+                <label>Reps</label>
+                <input type="number" id="inReps" value="10">
+            </div>
+            <div class="input-box">
+                <label>RPE</label>
+                <input type="number" id="inRPE" value="8">
+            </div>
+        </div>
+
+        <button onclick="commitSet()" class="btn-card primary" style="width: 100%; margin-top: 40px; height: 70px; font-size: 1rem;">Log Performance Set</button>
+        <button onclick="abortSession()" style="margin-top: 20px; background: none; border: none; color: var(--accent-red); font-weight: 800; font-size: 0.7rem; letter-spacing: 1px; cursor: pointer;">ABORT PROTOCOL</button>
+    </div>
+</div>
+
+<script>
+    const SYSTEM_DATA = {
+        assigned: {{ assigned|tojson if assigned else 'null' }},
+        ppl: [
+            { 
+                id: 'ppl_push', 
+                name: 'Alpha Push', 
+                label: '',
+                meta: 'Force generation focused on Chest, Shoulders, and Triceps.', 
+                ex: [
+                    { name: 'Incline Dumbbell Press', sets: 4, reps: '8-10' },
+                    { name: 'Overhead Press', sets: 3, reps: '10-12' },
+                    { name: 'Lateral Raises', sets: 4, reps: '15' }
+                ]
+            },
+            { 
+                id: 'ppl_pull', 
+                name: 'Alpha Pull', 
+                label: 'ARCHITECTURE // PPL',
+                meta: 'Structural pulling for Back and Biceps development.', 
+                ex: [
+                    { name: 'Deadlift', sets: 3, reps: '5' },
+                    { name: 'Weighted Pullups', sets: 3, reps: '8-10' },
+                    { name: 'Hammer Curls', sets: 3, reps: '12' }
+                ]
+            },
+            { 
+                id: 'ppl_legs', 
+                name: 'Alpha Legs', 
+                label: 'ARCHITECTURE // PPL',
+                meta: 'Maximum lower-body load for Quads and Hamstrings.', 
+                ex: [
+                    { name: 'High Bar Squat', sets: 4, reps: '6-8' },
+                    { name: 'Romanian Deadlift', sets: 3, reps: '10-12' },
+                    { name: 'Calf Raises', sets: 5, reps: '20' }
+                ]
+            }
+        ],
+        smart: [
+            { id: 's_bulk', goal: 'Bulk', level: 'Advanced', name: 'Hypertrophy Max', meta: 'High volume protocol for muscle tissue accretion.', ex: [
+                { name: 'Squats', sets: 5, reps: '10' },
+                { name: 'Bench Press', sets: 5, reps: '10' },
+                { name: 'Rows', sets: 5, reps: '10' }
+            ]}
+        ]
+    };
+
+    let activeSession = null;
+    let timer = null;
+    let seconds = 0;
+
+    function switchView(view) {
+        document.querySelectorAll('.nav-tab').forEach(t => {
+            t.classList.remove('active');
+            if (t.dataset.view === view) t.classList.add('active');
+        });
+        
+        const stage = document.getElementById('moduleStage');
+        stage.innerHTML = '';
+
+        if (view === 'coach') {
+            stage.className = 'module-grid';
+            if (!SYSTEM_DATA.assigned) {
+                stage.innerHTML = `
+                    <div class="system-card" style="text-align: center; padding: 60px 20px;">
+                        <div style="font-size: 3rem; margin-bottom: 20px;">📡</div>
+                        <div style="font-weight: 900; font-size: 1.2rem;">NO TACTICAL DEPLOYMENTS</div>
+                        <p style="color: var(--text-dim); font-size: 0.9rem; margin-top: 10px;">Your coach hasn\'t assigned a protocol yet.</p>
+                    </div>
+                `;
+            } else {
+                stage.innerHTML = `
+                    <div class="system-card">
+                        <div class="card-label">ASSIGNED PROTOCOL</div>
+                        <div class="card-title">Coach Program</div>
+                        <div class="card-meta">Custom training architecture synced to your unit.</div>
+                        <button onclick="startSession('assigned', 'coach')" class="btn-card primary" style="width:100%;"><i class="ph-bold ph-play"></i> Start Workout</button>
+                    </div>
+                `;
+            }
+        } else if (view === 'ppl') {
+            stage.className = 'module-grid';
+            SYSTEM_DATA.ppl.forEach(p => {
+                stage.innerHTML += `
+                    <div class="system-card">
+                        ${p.label ? `<div class="card-label">${p.label}</div>` : ''}
+                        <div class="card-title">${p.name}</div>
+                        <div class="card-meta">${p.meta}</div>
+                        <div class="card-actions">
+                            <button onclick="showProtocols('${p.id}')" class="btn-card secondary"><i class="ph-bold ph-notebook"></i> View Protocols</button>
+                            <button onclick="startSession('${p.id}', 'ppl')" class="btn-card primary"><i class="ph-bold ph-play"></i> Start Workout</button>
+                        </div>
+                    </div>
+                `;
+            });
+        } else if (view === 'custom') {
+            stage.className = 'builder-pane';
+            stage.innerHTML = `
+                <h2 style="font-weight: 900; margin-bottom: 20px;">Custom Architect</h2>
+                <input type="text" id="customName" class="builder-input" placeholder="Routine Name (e.g. Upper Body)">
+                <div id="architectList"></div>
+                <button onclick="addExNode()" class="btn-card secondary" style="width: 100%; margin-top: 15px;">+ Add Exercise</button>
+                <button onclick="saveCustom()" class="btn-card primary" style="width: 100%; margin-top: 15px;">Save Architecture</button>
+            `;
+            addExNode();
+        } else if (view === 'smart') {
+            stage.className = 'module-grid';
+            SYSTEM_DATA.smart.forEach(s => {
+                stage.innerHTML += `
+                    <div class="system-card">
+                        <div class="card-label">SMART AI // ${s.goal}</div>
+                        <div class="card-title">${s.name}</div>
+                        <div class="card-meta">Optimized for ${s.level} training goals.</div>
+                        <button onclick="startSession('${s.id}', 'smart')" class="btn-card primary" style="width: 100%;"><i class="ph-bold ph-sparkle"></i> Deploy Intelligence</button>
+                    </div>
+                `;
+            });
+        }
+    }
+
+    function showProtocols(id) {
+        const p = SYSTEM_DATA.ppl.find(x => x.id === id);
+        alert("Exercises in " + p.name + ":\n" + p.ex.map(e => "- " + e.name).join("\n"));
+    }
+
+    function addExNode() {
+        const container = document.getElementById('architectList');
+        const div = document.createElement('div');
+        div.style.cssText = "display: flex; gap: 10px; margin-bottom: 10px;";
+        div.innerHTML = `
+            <input type="text" placeholder="Exercise" style="flex: 2; padding: 15px; border-radius: 15px; border: none; background: var(--bg-subtle); font-weight: 700;">
+            <input type="text" placeholder="Sets" style="flex: 0.5; padding: 15px; border-radius: 15px; border: none; background: var(--bg-subtle); font-weight: 700; text-align: center;">
+            <button onclick="this.parentElement.remove()" style="background: none; border: none; color: var(--accent-red);"><i class="ph-bold ph-trash"></i></button>
+        `;
+        container.appendChild(div);
+    }
+
+    function startSession(id, type) {
+        let p = null;
+        if (type === 'ppl') p = SYSTEM_DATA.ppl.find(x => x.id === id);
+        else if (type === 'smart') p = SYSTEM_DATA.smart.find(x => x.id === id);
+        else if (type === 'coach') p = { name: 'Coach Protocol', ex: SYSTEM_DATA.assigned };
+        
+        if (!p) return;
+
+        activeSession = { name: p.name, ex: p.ex, curIdx: 0, curSet: 1 };
+        document.querySelector('.workout-container').style.display = 'none';
+        document.querySelector('.mobile-workout-header').style.display = 'none';
+        document.getElementById('sessionHUD').style.display = 'flex';
+        
+        startTimer();
+        updateHUD();
+    }
+
+    function updateHUD() {
+        const ex = activeSession.ex[activeSession.curIdx];
+        document.getElementById('hudExName').innerText = ex.name.toUpperCase();
+        document.getElementById('hudExLabel').innerText = `SET ${activeSession.curSet} OF ${ex.sets} [TARGET: ${ex.reps}]`;
+    }
+
+    function startTimer() {
+        seconds = 0;
+        timer = setInterval(() => {
+            seconds++;
+            const m = Math.floor(seconds / 60).toString().padStart(2, '0');
+            const s = (seconds % 60).toString().padStart(2, '0');
+            document.getElementById('hudTimer').innerText = `${m}:${s}`;
+        }, 1000);
+    }
+
+    function commitSet() {
+        activeSession.curSet++;
+        if (activeSession.curSet > activeSession.ex[activeSession.curIdx].sets) {
+            activeSession.curSet = 1;
+            activeSession.curIdx++;
+        }
+
+        if (activeSession.curIdx >= activeSession.ex.length) {
+            clearInterval(timer);
+            alert("Workout Complete!");
+            location.reload();
+        } else {
+            updateHUD();
+        }
+    }
+
+    function abortSession() {
+        if (confirm("Abort workout?")) location.reload();
+    }
+
+    // Init
+    switchView('ppl');
+</script>
+{% endblock %}

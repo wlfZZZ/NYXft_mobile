@@ -1,0 +1,651 @@
+{% extends "client/base_portal.html" %}
+
+{% block title %}Intelligence Dashboard | NYXFT{% endblock %}
+
+{% set active_page = 'dashboard' %}
+
+{% block extra_css %}
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+    :root {
+        --accent-indigo: #4F46E5;
+        --accent-red: #EF4444;
+        --text-main: #0F172A;
+        --text-slate: #475569;
+        --text-dim: #94A3B8;
+        --bg-primary: #F8FAFC; 
+        --bg-card: #FFFFFF;
+        --bg-subtle: #F1F5F9;
+        --border-light: rgba(15, 23, 42, 0.05);
+        --glass-border: rgba(255, 255, 255, 0.8);
+        --glass-glow: rgba(255, 255, 255, 0.4);
+        --card-radius: 28px;
+        --safe-bottom: 120px;
+    }
+
+    body {
+        background-color: var(--bg-primary);
+        color: var(--text-main);
+        font-family: 'Outfit', -apple-system, sans-serif;
+        -webkit-font-smoothing: antialiased;
+    }
+
+    .dashboard-container {
+        padding: 155px 20px var(--safe-bottom) 20px;
+        max-width: 600px;
+        margin: 0 auto;
+    }
+
+    /* ════ ADVANCED GLASS HEADER ════ */
+    .mobile-dash-header {
+        position: fixed;
+        top: 0; left: 0; right: 0;
+        background: rgba(255, 255, 255, 0.75);
+        backdrop-filter: blur(30px) saturate(200%);
+        -webkit-backdrop-filter: blur(30px) saturate(200%);
+        z-index: 1000;
+        padding: 20px 20px 16px 20px;
+        border-bottom: 1px solid var(--border-light);
+        box-shadow: inset 0 1px 0 var(--glass-border), 0 1px 3px rgba(0,0,0,0.02);
+    }
+
+    .header-ribbon {
+        display: flex; justify-content: space-between; align-items: center;
+        margin-bottom: 12px;
+    }
+
+    .ribbon-left { display: flex; align-items: center; gap: 12px; }
+
+    .brand-tag { 
+        font-size: 0.55rem; font-weight: 800; 
+        letter-spacing: 2px; color: var(--accent-indigo); 
+        text-transform: uppercase; background: rgba(255,255,255,0.5);
+        padding: 4px 8px; border-radius: 6px;
+        border: 1px solid var(--glass-border);
+    }
+
+    .streak-badge {
+        font-size: 0.55rem; font-weight: 800;
+        display: flex; align-items: center; gap: 4px;
+        color: var(--text-slate); letter-spacing: 1px;
+    }
+
+    .notif-btn {
+        width: 38px; height: 38px; background: rgba(255,255,255,0.5);
+        border: 1px solid var(--glass-border); border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 1.1rem; color: var(--text-main); cursor: pointer;
+        transition: 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        position: relative;
+    }
+    .notif-btn:active { transform: scale(0.9); }
+    .notif-btn::after {
+        content: ''; position: absolute; top: 10px; right: 10px;
+        width: 6px; height: 6px; background: var(--accent-red);
+        border-radius: 50%; border: 2px solid #fff;
+        box-shadow: 0 0 10px rgba(239, 68, 68, 0.3);
+    }
+
+    .header-greeting-row { display: flex; flex-direction: column; gap: 0px; }
+
+    .header-title { 
+        font-size: 2.1rem; font-weight: 300; 
+        letter-spacing: -1.5px; margin: 0; color: var(--text-slate);
+        line-height: 1;
+    }
+    .header-title b { font-weight: 900; color: var(--text-main); }
+
+    .header-telemetry {
+        font-size: 0.55rem; font-weight: 800; color: var(--text-dim);
+        letter-spacing: 1.5px; text-transform: uppercase;
+        margin-top: 4px;
+    }
+
+    /* ════ GLASS UTILITY TRAY ════ */
+    .utility-tray {
+        display: flex; gap: 10px; margin-bottom: 35px;
+        background: rgba(241, 245, 249, 0.8); padding: 8px;
+        border-radius: 100px;
+        box-shadow: inset 0 2px 10px rgba(0,0,0,0.05), 0 1px 0 rgba(255,255,255,0.8);
+        border: 1px solid var(--border-light);
+    }
+
+    .tray-btn {
+        flex: 1; display: flex; align-items: center; justify-content: center;
+        gap: 8px; background: #fff; border: 1px solid var(--glass-border);
+        padding: 12px; border-radius: 100px; font-size: 0.7rem; font-weight: 800;
+        text-transform: uppercase; letter-spacing: 0.5px;
+        color: var(--text-main); text-decoration: none;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.05), inset 0 1px 0 #fff;
+        transition: 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .tray-btn.primary { 
+        background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); 
+        color: #fff; border: none;
+        box-shadow: 0 8px 20px rgba(15, 23, 42, 0.15);
+    }
+
+    .tray-btn:active { transform: scale(0.95); opacity: 0.9; }
+    .tray-btn.locked { opacity: 0.5; filter: grayscale(1); pointer-events: none; }
+
+    /* ════ SECTION LABELS ════ */
+    .section-label {
+        font-size: 0.6rem; font-weight: 800; color: var(--text-dim);
+        margin: 40px 0 10px 5px; letter-spacing: 1.5px; text-transform: uppercase;
+    }
+    .section-label:first-of-type { margin-top: 0; }
+
+    /* ════ SPECULAR REFLECTION CARDS ════ */
+    .intel-grid {
+        display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 0px;
+    }
+
+    .hero-card { grid-column: span 2; }
+
+    .intel-card {
+        background: linear-gradient(135deg, #ffffff 0%, #f9fafb 100%);
+        border: 1px solid var(--glass-border);
+        padding: 18px; border-radius: var(--card-radius);
+        box-shadow: 
+            0 1px 1px rgba(0,0,0,0.01),
+            0 15px 35px -12px rgba(15, 23, 42, 0.06),
+            inset 0 1px 0 var(--glass-glow);
+        display: flex; flex-direction: column; gap: 10px;
+        position: relative;
+        overflow: hidden;
+        cursor: pointer;
+    }
+
+    /* Specular Reflection Catch */
+    .intel-card::before {
+        content: ''; position: absolute; top: 0; left: 0; right: 0;
+        height: 1px; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.8), transparent);
+        opacity: 0.5;
+    }
+
+    .hero-card { padding: 24px; }
+
+    .card-header { display: flex; justify-content: space-between; align-items: flex-start; }
+    .card-tag { font-size: 0.65rem; font-weight: 800; color: var(--text-slate); text-transform: uppercase; letter-spacing: 0.5px; }
+    .card-icon { font-size: 1.1rem; }
+
+    .val-stack { display: flex; flex-direction: column; }
+    .main-val { font-size: 2.2rem; font-weight: 900; letter-spacing: -1.5px; line-height: 1; color: var(--text-main); }
+    .main-val span.unit { font-size: 0.8rem; font-weight: 700; color: var(--text-slate); margin-left: 4px; letter-spacing: 0; }
+    .sub-val { font-size: 0.75rem; font-weight: 700; color: var(--text-dim); margin-top: 4px; }
+
+    .progress-track {
+        height: 6px; background: var(--bg-subtle);
+        border-radius: 10px; overflow: hidden; margin-top: 5px;
+        box-shadow: inset 0 1px 2px rgba(0,0,0,0.03);
+    }
+    .progress-fill {
+        height: 100%; background: linear-gradient(90deg, #0f172a, #334155);
+        border-radius: 10px;
+        transition: width 1s cubic-bezier(0.65, 0, 0.35, 1);
+    }
+
+    .macro-bar { font-size: 0.75rem; font-weight: 800; padding-top: 10px; border-top: 1px solid var(--border-light); color: var(--text-dim); }
+
+    /* ════ SYSTEM INTEGRITY CHART ════ */
+    .integrity-card { display: flex; flex-direction: row; align-items: center; justify-content: space-between; }
+    .integrity-data { display: flex; flex-direction: column; }
+
+    /* ════ GLASS FEED LOGS ════ */
+    .feed-stack { display: flex; flex-direction: column; gap: 12px; }
+    .feed-item {
+        display: flex; align-items: center; gap: 15px;
+        padding: 15px; background: rgba(255,255,255,0.7); border: 1px solid var(--glass-border);
+        border-radius: 22px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.03), inset 0 1px 0 #fff;
+    }
+    .feed-icon { width: 36px; height: 36px; background: var(--bg-subtle); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1rem; flex-shrink: 0; box-shadow: inset 0 1px 3px rgba(0,0,0,0.03); }
+    .feed-content { flex: 1; display: flex; justify-content: space-between; align-items: center; }
+    .feed-heading { font-size: 0.85rem; font-weight: 800; }
+    .feed-time { font-size: 0.65rem; font-weight: 700; color: var(--text-dim); }
+
+    /* ════ PULL HUD ════ */
+    .pull-hud {
+        position: fixed; top: 80px; left: 0; right: 0;
+        display: flex; flex-direction: column; align-items: center;
+        gap: 8px; pointer-events: none; opacity: 0; transform: translateY(-20px);
+        transition: 0.4s cubic-bezier(0.16, 1, 0.3, 1); z-index: 900;
+    }
+    .pull-hud.active { opacity: 1; transform: translateY(0); }
+    .pull-ring { width: 28px; height: 28px; border: 3px solid var(--bg-subtle); border-top-color: var(--accent-indigo); border-radius: 50%; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
+    .pull-hud.loading .pull-ring { animation: spin 0.8s linear infinite; }
+    .pull-label { font-size: 0.55rem; font-weight: 900; color: var(--accent-indigo); letter-spacing: 2px; text-shadow: 0 0 10px rgba(79, 70, 229, 0.2); }
+
+    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+    @media (min-width: 1025px) {
+        .dashboard-container { max-width: 1000px; padding-top: 160px; }
+        .intel-grid { grid-template-columns: 1fr 1fr 1fr; }
+        .hero-card { grid-column: span 3; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- PULL TO SYNC HUD -->
+<div class="pull-hud" id="pullHUD">
+    <div class="pull-ring"></div>
+    <span class="pull-label" id="pullLabel">PULL_TO_UPLINK</span>
+</div>
+
+<!-- STICKY HEADER -->
+<div class="mobile-dash-header">
+    <div class="header-ribbon">
+        <div class="ribbon-left">
+            <div class="brand-tag">SYS_PROTOCOL // NYX</div>
+            <div class="streak-badge">
+                <i class="ph-fill ph-fire" style="color: #F97316;"></i> {{ stats.streak }}D_STREAK
+            </div>
+        </div>
+        <button class="notif-btn">
+            <i class="ph-bold ph-bell"></i>
+        </button>
+    </div>
+    <div class="header-greeting-row">
+        <h1 class="header-title">Hello, <b>{{ user.name.split(' ')[0] }}!</b></h1>
+        <span class="header-telemetry">STATUS: OPTIMAL_SYNC // <span id="telemetryTime">...</span></span>
+    </div>
+</div>
+
+<div class="dashboard-container">
+    <!-- UTILITY TRAY -->
+    <div class="utility-tray">
+        <button class="tray-btn {% if has_logged_weight %}locked{% endif %}" onclick="openWeightModal()">
+            <i class="ph-bold ph-scales"></i>
+            {% if has_logged_weight %}Logged{% else %}Weight{% endif %}
+        </button>
+        <a href="/workouts" class="tray-btn primary">
+            <i class="ph-bold ph-barbell"></i> Training
+        </a>
+        <button class="tray-btn" onclick="syncActivity()">
+            <i class="ph-bold ph-arrows-clockwise" id="syncIcon"></i> Sync
+        </button>
+    </div>
+
+    <!-- NUTRITION SECTION -->
+    <div class="section-label">[ 01: FUEL_PROTOCOL ]</div>
+    <div class="intel-grid">
+        <div class="intel-card hero-card" onclick="openMetricDetail('fuel')">
+            <div class="card-header">
+                <span class="card-tag">Current Energy Intake</span>
+                <i class="ph-bold ph-lightning card-icon" style="color: var(--accent-red);"></i>
+            </div>
+            <div class="val-stack">
+                <span class="main-val"><span id="dashCals">--</span><span class="unit">kcal</span></span>
+                <span class="sub-val">Target: <span id="dashCalsTarget">--</span> kcal</span>
+            </div>
+            <div class="progress-track">
+                <div id="dashCalsProgress" class="progress-fill" style="width: 0%;"></div>
+            </div>
+            <div id="dashMacros" class="macro-bar">Uplinking system metrics...</div>
+        </div>
+    </div>
+
+    <!-- BIOMETRIC SECTION -->
+    <div class="section-label">[ 02: BIOMETRICS ]</div>
+    <div class="intel-grid">
+        <div class="intel-card" onclick="openMetricDetail('movement')">
+            <div class="card-header">
+                <span class="card-tag">Movement</span>
+                <i class="ph-bold ph-footprints card-icon" style="color: var(--accent-indigo);"></i>
+            </div>
+            <div class="val-stack">
+                <span class="main-val" id="stepsValue">0</span>
+                <span class="sub-val">Goal: {{ stats.step_goal }}</span>
+            </div>
+            <div class="progress-track">
+                <div class="progress-fill" style="width: {{ (stats.latest_steps / stats.step_goal * 100)|int }}%;"></div>
+            </div>
+        </div>
+
+        <div class="intel-card" onclick="openMetricDetail('biometrics')">
+            <div class="card-header">
+                <span class="card-tag">Mass Trend</span>
+                <i class="ph-bold ph-chart-line-up card-icon"></i>
+            </div>
+            <div class="val-stack">
+                <span class="main-val"><span id="weightValue">0</span><span class="unit">kg</span></span>
+                <span class="sub-val">
+                    {% if stats.weight_trend > 0 %} +{{ stats.weight_trend }}kg trend {% elif stats.weight_trend < 0 %} {{ stats.weight_trend }}kg trend {% else %} Stable Profile {% endif %}
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <!-- SYSTEM SECTION -->
+    <div class="section-label">[ 03: SYSTEM_INTEGRITY ]</div>
+    <div class="intel-grid">
+        <div class="intel-card hero-card integrity-card">
+            <div class="integrity-data">
+                <span class="card-tag">Protocol Consistency</span>
+                <span class="main-val" style="margin-top:5px;">{{ stats.consistency }}</span>
+                <span class="sub-val">Optimal Synchronization</span>
+            </div>
+            <div style="position: relative; width: 70px; height: 70px;">
+                <canvas id="consistencyChart" width="70" height="70"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- PERFORMANCE SECTION -->
+    <div class="section-label">[ 04: MASS_EVOLUTION ]</div>
+    <div class="intel-card hero-card" style="margin-bottom: 30px;">
+        <canvas id="weightLineChart" height="140"></canvas>
+    </div>
+
+    <!-- INTELLIGENCE FEED -->
+    <div class="section-label">[ 05: INTELLIGENCE_FEED ]</div>
+    <div class="feed-stack">
+        {% if stats.timeline %}
+            {% for item in stats.timeline %}
+            <div class="feed-item">
+                <div class="feed-icon"><i class="ph-bold {{ item.icon }}"></i></div>
+                <div class="feed-content">
+                    <span class="feed-heading">{{ item.title }}</span>
+                    <span class="feed-time">{{ item.time }}</span>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="feed-item" style="justify-content: center; color: var(--text-dim);">
+                <span class="feed-heading">No Active Alerts</span>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- BIOMETRIC SHEETS -->
+<div class="nyx-sheet" id="weightSheet">
+    <div class="nyx-sheet-handle"></div>
+    <div class="nyx-sheet-content">
+        <div class="nyx-sheet-header">
+            <h2 class="nyx-sheet-title">Log Body Mass</h2>
+            <p class="nyx-sheet-desc">Update biometric profile</p>
+        </div>
+        <div class="input-wrapper" style="background: var(--bg-subtle); padding: 30px; border-radius: 24px; margin-bottom: 30px;">
+            <input type="number" id="weightInput" step="0.1" placeholder="00.0" 
+                   style="width: 100%; background: transparent; border: none; font-size: 3rem; font-weight: 900; text-align: center; outline: none;">
+            <div style="text-align: center; font-size: 0.7rem; font-weight: 900; color: var(--text-dim); letter-spacing: 2px;">KILOGRAMS (KG)</div>
+        </div>
+        <button class="btn-action" onclick="submitWeight()">SYNC BIOMETRICS</button>
+        <button class="btn-action" style="background:transparent; color:var(--text-dim); margin-top:10px;" onclick="NYXSheet.close()">DISMISS</button>
+    </div>
+</div>
+
+<div class="nyx-sheet" id="stepsSheet">
+    <div class="nyx-sheet-handle"></div>
+    <div class="nyx-sheet-content">
+        <div class="nyx-sheet-header">
+            <h2 class="nyx-sheet-title">Log Movement</h2>
+            <p class="nyx-sheet-desc">Sync step telemetry</p>
+        </div>
+        <div class="input-wrapper" style="background: var(--bg-subtle); padding: 30px; border-radius: 24px; margin-bottom: 30px;">
+            <input type="number" id="stepsInput" placeholder="10000" 
+                   style="width: 100%; background: transparent; border: none; font-size: 3rem; font-weight: 900; text-align: center; outline: none;">
+            <div style="text-align: center; font-size: 0.7rem; font-weight: 900; color: var(--text-dim); letter-spacing: 2px;">TOTAL STEPS</div>
+        </div>
+        <button class="btn-action" onclick="submitSteps()">SYNC MOVEMENT</button>
+        <button class="btn-action" style="background:transparent; color:var(--text-dim); margin-top:10px;" onclick="NYXSheet.close()">DISMISS</button>
+    </div>
+</div>
+
+<!-- DYNAMIC INTEL SHEET -->
+<div class="nyx-sheet" id="metricDetailSheet">
+    <div class="nyx-sheet-handle"></div>
+    <div class="nyx-sheet-content">
+        <div class="nyx-sheet-header">
+            <h2 id="metricTitle" class="nyx-sheet-title">Metric Detail</h2>
+            <p id="metricDesc" class="nyx-sheet-desc">Advanced data breakdown</p>
+        </div>
+        
+        <div id="metricBody" style="padding-bottom: 20px;">
+            <!-- Content Injected via JS -->
+        </div>
+
+        <div style="display: flex; gap: 10px; margin-top: 10px;">
+            <button id="metricActionBtn" class="btn-action" style="flex: 2;">LOG NEW DATA</button>
+            <button class="btn-action" style="background:var(--bg-subtle); color:#000; flex: 1;" onclick="NYXSheet.close()">CLOSE</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    
+    // ── HAPTIC & PULL LOGIC ──
+    const pullHUD = document.getElementById('pullHUD');
+    const pullLabel = document.getElementById('pullLabel');
+    const scrollContainer = document.querySelector('.dash-main');
+    let touchStart = 0;
+    let pullDistance = 0;
+
+    scrollContainer.addEventListener('touchstart', (e) => {
+        if (scrollContainer.scrollTop === 0) touchStart = e.touches[0].pageY;
+    }, { passive: true });
+
+    scrollContainer.addEventListener('touchmove', (e) => {
+        if (touchStart === 0) return;
+        const currentTouch = e.touches[0].pageY;
+        pullDistance = Math.min(80, Math.max(0, currentTouch - touchStart));
+        
+        if (pullDistance > 15) {
+            pullHUD.classList.add('active');
+            pullHUD.style.transform = `translateY(${pullDistance - 30}px)`;
+            pullLabel.innerText = pullDistance > 70 ? "RELEASE_TO_SYNC" : "PULL_TO_UPLINK";
+            if (pullDistance > 70) pullHUD.classList.add('ready');
+            else pullHUD.classList.remove('ready');
+        }
+    }, { passive: true });
+
+    scrollContainer.addEventListener('touchend', () => {
+        if (pullDistance > 70) executeSync();
+        else resetPull();
+        touchStart = 0; pullDistance = 0;
+    });
+
+    function resetPull() {
+        pullHUD.classList.remove('active', 'ready', 'loading');
+        pullHUD.style.transform = 'translateY(-20px)';
+    }
+
+    async function executeSync() {
+        pullHUD.classList.add('loading');
+        pullLabel.innerText = "SYNCHRONIZING...";
+        await syncActivity();
+        setTimeout(() => {
+            pullLabel.innerText = "UPDATED";
+            setTimeout(resetPull, 800);
+        }, 500);
+    }
+
+    // ── CHARTS ──
+    const ctxConsistency = document.getElementById('consistencyChart').getContext('2d');
+    const consistencyValue = parseInt("{{ stats.consistency.replace('%','') }}") || 0;
+    
+    new Chart(ctxConsistency, {
+        type: 'doughnut',
+        data: {
+            datasets: [{
+                data: [consistencyValue, 100 - consistencyValue],
+                backgroundColor: ['#0F172A', '#F1F5F9'],
+                borderWidth: 0,
+                borderRadius: 10
+            }]
+        },
+        options: { cutout: '80%', responsive: false, plugins: { tooltip: { enabled: false }, legend: { display: false } } }
+    });
+
+    const ctxWeight = document.getElementById('weightLineChart').getContext('2d');
+    new Chart(ctxWeight, {
+        type: 'line',
+        data: {
+            labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+            datasets: [{
+                data: {{ stats.weekly_weight|tojson }},
+                borderColor: '#0F172A',
+                backgroundColor: 'rgba(15, 23, 42, 0.03)',
+                fill: true, tension: 0.4, pointRadius: 0, borderWidth: 3
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: { legend: { display: false } },
+            scales: { y: { display: false }, x: { grid: { display: false }, ticks: { font: { weight: 700, family: 'Outfit' } } } }
+        }
+    });
+
+    // ── DATA ANIMATIONS ──
+    function animateValue(obj, start, end, duration) {
+        let startTimestamp = null;
+        const step = (timestamp) => {
+            if (!startTimestamp) startTimestamp = timestamp;
+            const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+            obj.innerHTML = (progress * (end - start) + start).toFixed(obj.id === 'weightValue' ? 1 : 0);
+            if (progress < 1) window.requestAnimationFrame(step);
+        };
+        window.requestAnimationFrame(step);
+    }
+
+    const stepsVal = document.getElementById('stepsValue');
+    const weightVal = document.getElementById('weightValue');
+    if (stepsVal) animateValue(stepsVal, 0, parseInt("{{ stats.latest_steps }}"), 1500);
+    if (weightVal) animateValue(weightVal, 0, parseFloat("{{ stats.latest_weight }}"), 1000);
+
+    // ── CORE LOGIC ──
+    window.openWeightModal = () => { NYXSheet.open('weightSheet'); };
+    window.openStepsModal = () => { NYXSheet.open('stepsSheet'); };
+
+    window.submitWeight = async () => {
+        const val = parseFloat(document.getElementById('weightInput').value);
+        if (!val) return;
+        const res = await fetch('/api/log', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ weight: val })
+        });
+        if (res.ok) location.reload();
+        else { alert("System Error"); closeWeightModal(); }
+    };
+
+    window.submitSteps = async () => {
+        const val = parseInt(document.getElementById('stepsInput').value);
+        if (!val) return;
+        const res = await fetch('/api/log', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ steps: val })
+        });
+        if (res.ok) location.reload();
+    };
+
+    window.syncActivity = async () => {
+        const icon = document.getElementById('syncIcon');
+        if (icon) icon.style.animation = 'spin 1s linear infinite';
+        await syncNutrition();
+        setTimeout(() => { if (icon) icon.style.animation = 'none'; }, 1000);
+    };
+
+    async function syncNutrition() {
+        try {
+            const res = await fetch('/api/nutrition/data');
+            const data = await res.json();
+            const { totals, targets } = data;
+            document.getElementById('dashCals').innerText = Math.round(totals.calories);
+            document.getElementById('dashCalsTarget').innerText = targets.calories;
+            const pct = Math.min(100, (totals.calories / targets.calories) * 100);
+            document.getElementById('dashCalsProgress').style.width = pct + '%';
+            document.getElementById('dashMacros').innerText = 
+                `${Math.round(totals.protein)}g P · ${Math.round(totals.carbs)}g C · ${Math.round(totals.fats)}g F`;
+            
+            // Update Telemetry Time
+            const now = new Date();
+            document.getElementById('telemetryTime').innerText = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        } catch (err) { console.warn("Nutrition sync failed"); }
+    }
+    syncNutrition();
+
+    // ── DYNAMIC METRIC SHEET LOGIC ──
+    const metricConfigs = {
+        fuel: {
+            title: "Fuel Protocol",
+            desc: "Energy synchronization data",
+            action: openSearchSheet,
+            render: () => `
+                <div class="intel-card" style="background: var(--bg-subtle); border:none; margin-bottom:15px;">
+                    <div class="card-tag">Daily Budget</div>
+                    <div class="main-val">${document.getElementById('dashCalsTarget').innerText} <span class="unit">kcal</span></div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                    <div class="intel-card" style="padding:15px;">
+                        <div class="card-tag">Current Intake</div>
+                        <div style="font-weight:900;">${document.getElementById('dashCals').innerText} kcal</div>
+                    </div>
+                    <div class="intel-card" style="padding:15px;">
+                        <div class="card-tag">Status</div>
+                        <div style="font-weight:900; color:var(--accent-indigo);">OPTIMAL</div>
+                    </div>
+                </div>
+            `
+        },
+        movement: {
+            title: "Movement Intel",
+            desc: "Step telemetry and goals",
+            action: () => { NYXSheet.close(); setTimeout(openStepsModal, 400); },
+            render: () => `
+                <div class="intel-card" style="background: var(--bg-subtle); border:none; margin-bottom:15px;">
+                    <div class="card-tag">Today's Progress</div>
+                    <div class="main-val">${document.getElementById('stepsValue').innerText} <span class="unit">steps</span></div>
+                </div>
+                <div class="feed-item" style="margin-top:10px;">
+                    <div class="feed-icon"><i class="ph-bold ph-trend-up"></i></div>
+                    <div class="feed-content">
+                        <span class="feed-heading">Active Streak</span>
+                        <span class="feed-time">{{ stats.streak }} Days</span>
+                    </div>
+                </div>
+            `
+        },
+        biometrics: {
+            title: "Mass Evolution",
+            desc: "Weight trend and biometrics",
+            action: () => { NYXSheet.close(); setTimeout(openWeightModal, 400); },
+            render: () => `
+                <div class="intel-card" style="background: var(--bg-subtle); border:none; margin-bottom:15px;">
+                    <div class="card-tag">Latest Mass</div>
+                    <div class="main-val">${document.getElementById('weightValue').innerText} <span class="unit">kg</span></div>
+                </div>
+                <div class="macro-bar" style="border:none; padding:0;">
+                    Trend: {% if stats.weight_trend > 0 %} Gain Profile {% else %} Loss Profile {% endif %}
+                </div>
+            `
+        }
+    };
+
+    window.openMetricDetail = (type) => {
+        const config = metricConfigs[type];
+        if (!config) return;
+
+        document.getElementById('metricTitle').innerText = config.title;
+        document.getElementById('metricDesc').innerText = config.desc;
+        document.getElementById('metricBody').innerHTML = config.render();
+        
+        const actionBtn = document.getElementById('metricActionBtn');
+        actionBtn.onclick = config.action;
+        
+        NYXSheet.open('metricDetailSheet');
+    };
+
+    function openSearchSheet() {
+        window.location.href = '/nutrition';
+    }
+});
+</script>
+{% endblock %}

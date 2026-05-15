@@ -1,0 +1,530 @@
+{% extends "client/base_portal.html" %}
+
+{% block title %}Diet & Nutrition | NYXFT{% endblock %}
+
+{% set active_page = 'nutrition' %}
+
+{% block extra_css %}
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+    :root {
+        --accent-blue: #007AFF;
+        --accent-red: #FF453A;
+        --accent-green: #34C759;
+        --accent-purple: #AF52DE;
+        --text-main: #000000;
+        --text-dim: #8E8E93;
+        --bg-primary: #FFFFFF;
+        --bg-subtle: #F2F2F7;
+        --border-light: rgba(0,0,0,0.05);
+        --card-radius: 24px;
+        --safe-bottom: 120px;
+    }
+
+    body {
+        background-color: var(--bg-primary);
+        color: var(--text-main);
+        font-family: 'Outfit', -apple-system, sans-serif;
+        -webkit-font-smoothing: antialiased;
+        margin: 0; padding: 0;
+    }
+
+    .nutrition-container {
+        padding: 40px 20px var(--safe-bottom) 20px;
+        max-width: 500px;
+        margin: 0 auto;
+    }
+
+    /* ════ TOP HEADER ════ */
+    .header-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 30px;
+    }
+    .header-title { font-size: 1.8rem; font-weight: 900; margin: 0; letter-spacing: -0.5px; }
+    .btn-add-food-top {
+        background: #000; color: #fff;
+        padding: 10px 18px; border-radius: 100px;
+        font-size: 0.8rem; font-weight: 800;
+        display: flex; align-items: center; gap: 6px;
+        cursor: pointer; border: none;
+    }
+
+    /* ════ SCAN CARD ════ */
+    .scan-card {
+        background: #fff;
+        border: 1px solid var(--border-light);
+        border-radius: var(--card-radius);
+        padding: 20px;
+        display: flex; align-items: center; gap: 15px;
+        margin-bottom: 40px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.02);
+    }
+    .scan-icon-box {
+        width: 60px; height: 60px;
+        background: var(--bg-subtle);
+        border-radius: 16px;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 1.5rem; color: #000;
+    }
+    .scan-content { flex: 1; }
+    .scan-label { font-size: 1rem; font-weight: 800; display: block; }
+    .scan-sub { font-size: 0.75rem; color: var(--text-dim); font-weight: 600; }
+
+    /* ════ FUEL COMMAND SECTION ════ */
+    .fuel-command-section {
+        text-align: center;
+        margin-bottom: 40px;
+    }
+    .status-badge {
+        background: var(--accent-blue);
+        color: #fff;
+        padding: 6px 14px;
+        border-radius: 100px;
+        font-size: 0.6rem;
+        font-weight: 900;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        display: inline-block;
+        margin-bottom: 12px;
+    }
+    .section-title { font-size: 1.6rem; font-weight: 900; margin: 0 0 25px 0; letter-spacing: -0.5px; }
+
+    .hub-ring-container {
+        position: relative;
+        width: 220px; height: 220px;
+        margin: 0 auto;
+    }
+    .ring-svg { transform: rotate(-90deg); width: 100%; height: 100%; }
+    .ring-bg { fill: none; stroke: var(--bg-subtle); stroke-width: 10; }
+    .ring-progress { 
+        fill: none; stroke-width: 10; stroke-linecap: round;
+        transition: stroke-dasharray 1s ease-in-out;
+    }
+    .hub-stats-center {
+        position: absolute; inset: 0;
+        display: flex; flex-direction: column;
+        align-items: center; justify-content: center;
+    }
+    .rem-label { font-size: 0.65rem; font-weight: 800; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
+    .rem-val { font-size: 3.5rem; font-weight: 900; letter-spacing: -2px; line-height: 1; margin: 2px 0; }
+    .rem-unit { font-size: 0.8rem; font-weight: 800; color: var(--text-dim); letter-spacing: 1px; }
+
+    /* ════ INTEL GRID ════ */
+    .intel-grid {
+        display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 40px;
+    }
+    .intel-card {
+        background: #fff;
+        border: 1px solid var(--border-light);
+        padding: 20px; border-radius: var(--card-radius);
+        display: flex; align-items: flex-start; gap: 12px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.01);
+    }
+    .card-icon-box {
+        width: 40px; height: 40px;
+        border-radius: 12px;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 1.1rem; flex-shrink: 0;
+    }
+    .card-content { display: flex; flex-direction: column; gap: 4px; }
+    .card-tag { font-size: 0.6rem; font-weight: 800; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; }
+    .card-val { font-size: 1.2rem; font-weight: 900; line-height: 1; }
+    .card-sub { font-size: 0.7rem; font-weight: 700; color: var(--text-dim); }
+    .card-link { font-size: 0.7rem; font-weight: 900; color: var(--accent-blue); text-decoration: none; margin-top: 2px; display: block; }
+
+    /* ════ ACTIVE FEED ════ */
+    .feed-title { font-size: 1.1rem; font-weight: 900; margin-bottom: 15px; display: block; }
+    .meal-selector-card {
+        background: #fff;
+        border: 1px solid var(--border-light);
+        border-radius: var(--card-radius);
+        display: flex; justify-content: space-between;
+        padding: 25px 15px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.02);
+    }
+    .meal-col {
+        flex: 1; display: flex; flex-direction: column; align-items: center; gap: 8px;
+        cursor: pointer; transition: 0.2s;
+    }
+    .meal-col:active { transform: scale(0.95); opacity: 0.7; }
+    .meal-icon { font-size: 1.5rem; color: #000; }
+    .meal-label { font-size: 0.55rem; font-weight: 900; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; }
+    .meal-kcal { font-size: 0.7rem; font-weight: 800; }
+
+    #portionControl, #customFoodView { display: none; flex-direction: column; gap: 20px; }
+    .custom-input-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .custom-field { background: var(--bg-subtle); padding: 15px; border-radius: 16px; border: none; font-weight: 700; width: 100%; box-sizing: border-box; font-family: inherit; }
+
+    @media (min-width: 1025px) {
+        .nutrition-container { max-width: 800px; padding-top: 60px; }
+        .intel-grid { grid-template-columns: 1fr 1fr 1fr 1fr; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="nutrition-container">
+    <!-- HEADER -->
+    <div class="header-row">
+        <h1 class="header-title">Diet & Nutrition</h1>
+        <button class="btn-add-food-top" onclick="openSearch('General')">
+            <i class="ph-bold ph-plus"></i> Add Food
+        </button>
+    </div>
+
+    <!-- SCAN CARD -->
+    <div class="scan-card">
+        <div class="scan-icon-box">
+            <i class="ph-bold ph-scan"></i>
+        </div>
+        <div class="scan-content">
+            <span class="scan-label">Scan Food / Barcode</span>
+            <span class="scan-sub">Scan to log food instantly</span>
+        </div>
+        <i class="ph-bold ph-caret-right" style="color: var(--text-dim);"></i>
+    </div>
+
+    <!-- FUEL COMMAND SECTION -->
+    <div class="fuel-command-section">
+        <div id="protocolStatus" class="status-badge">Status: Protocol Synchronized</div>
+        <h2 class="section-title">Fuel Command</h2>
+
+        <div class="hub-ring-container">
+            <svg class="ring-svg" viewBox="0 0 100 100">
+                <circle class="ring-bg" cx="50" cy="50" r="45"></circle>
+                <circle id="mainRing" class="ring-progress" cx="50" cy="50" r="45" stroke="var(--accent-blue)"></circle>
+            </svg>
+            <div class="hub-stats-center">
+                <span class="rem-label">Remaining</span>
+                <span id="remainingCals" class="rem-val">2640</span>
+                <span class="rem-unit">KCAL</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- INTEL GRID -->
+    <div class="intel-grid">
+        <div class="intel-card" style="background: rgba(0, 122, 255, 0.03);">
+            <div class="card-icon-box" style="background: rgba(0, 122, 255, 0.1); color: var(--accent-blue);">
+                <i class="ph-bold ph-drop"></i>
+            </div>
+            <div class="card-content">
+                <span class="card-tag">Hydration</span>
+                <span id="waterVal" class="card-val">1.8L</span>
+                <a href="javascript:void(0)" onclick="addWater(0.25)" class="card-link">+250ML TAP</a>
+            </div>
+        </div>
+        <div class="intel-card">
+            <div class="card-icon-box" style="background: rgba(0, 0, 0, 0.05); color: #000;">
+                <i class="ph-bold ph-chart-line-up"></i>
+            </div>
+            <div class="card-content">
+                <span class="card-tag">Progression</span>
+                <span id="nutriGoal" class="card-val">Maintain</span>
+                <span id="nutriWeek" class="card-sub">Week 1</span>
+            </div>
+        </div>
+        <div class="intel-card">
+            <div class="card-icon-box" style="background: rgba(52, 199, 89, 0.1); color: var(--accent-green);">
+                <i class="ph-bold ph-lightning"></i>
+            </div>
+            <div class="card-content">
+                <span class="card-tag">Energy In</span>
+                <span id="totalCals" class="card-val">0</span>
+                <span class="card-sub">Total Logged</span>
+            </div>
+        </div>
+        <div class="intel-card">
+            <div class="card-icon-box" style="background: rgba(175, 82, 222, 0.1); color: var(--accent-purple);">
+                <i class="ph-bold ph-fire"></i>
+            </div>
+            <div class="card-content">
+                <span class="card-tag">TDEE Est.</span>
+                <span id="tdeeVal" class="card-val">2640</span>
+                <span class="card-sub">Metabolic Base</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ACTIVE FEED -->
+    <span class="feed-title">Active Protocol Feed</span>
+    <div class="meal-selector-card">
+        <div class="meal-col" onclick="openSearch('Breakfast')">
+            <i class="ph-bold ph-sun meal-icon"></i>
+            <span class="meal-label">Breakfast</span>
+            <span id="sum-breakfast" class="meal-kcal">0 kcal</span>
+        </div>
+        <div style="width: 1px; background: var(--bg-subtle);"></div>
+        <div class="meal-col" onclick="openSearch('Lunch')">
+            <i class="ph-bold ph-cloud-sun meal-icon"></i>
+            <span class="meal-label">Lunch</span>
+            <span id="sum-lunch" class="meal-kcal">0 kcal</span>
+        </div>
+        <div style="width: 1px; background: var(--bg-subtle);"></div>
+        <div class="meal-col" onclick="openSearch('Dinner')">
+            <i class="ph-bold ph-moon meal-icon"></i>
+            <span class="meal-label">Dinner</span>
+            <span id="sum-dinner" class="meal-kcal">0 kcal</span>
+        </div>
+        <div style="width: 1px; background: var(--bg-subtle);"></div>
+        <div class="meal-col" onclick="openSearch('Snacks')">
+            <i class="ph-bold ph-cookie meal-icon"></i>
+            <span class="meal-label">Snacks</span>
+            <span id="sum-snacks" class="meal-kcal">0 kcal</span>
+        </div>
+    </div>
+</div>
+
+<!-- NATIVE SEARCH SHEET -->
+<div class="nyx-sheet" id="searchSheet">
+    <div class="nyx-sheet-handle"></div>
+    <div class="nyx-sheet-content">
+        <div id="searchView">
+            <div class="nyx-sheet-header">
+                <h2 id="drawerTitle" class="nyx-sheet-title">Log Fuel</h2>
+                <p class="nyx-sheet-desc">Search the system database</p>
+                <button onclick="openCustomView()" style="background: var(--bg-subtle); border: none; padding: 8px 14px; border-radius: 10px; font-size: 0.7rem; font-weight: 800; cursor: pointer; margin-top: 10px;">
+                    <i class="ph-bold ph-pencil-simple"></i> CUSTOM ENTRY
+                </button>
+            </div>
+            <input type="text" id="foodSearch" class="cal-input" placeholder="Search system database..." oninput="handleSearch(this.value)" style="margin-bottom: 20px;">
+            <div id="searchResults" style="overflow-y: auto; max-height: 400px;">
+                <div style="text-align: center; padding: 40px 0; color: var(--text-dim); font-weight: 700;">Scanning system database...</div>
+            </div>
+        </div>
+
+        <!-- CUSTOM FOOD VIEW -->
+        <div id="customFoodView">
+            <div class="nyx-sheet-header">
+                <h2 class="nyx-sheet-title">Manual Intel</h2>
+                <p class="nyx-sheet-desc">Define custom macro profile</p>
+            </div>
+            <input type="text" id="customName" class="cal-input" placeholder="Food Name" style="margin-bottom: 12px;">
+            
+            <div class="custom-input-grid">
+                <div>
+                    <label class="card-tag">CALORIES</label>
+                    <input type="number" id="customCals" class="cal-input" placeholder="0">
+                </div>
+                <div>
+                    <label class="card-tag">PROTEIN (G)</label>
+                    <input type="number" id="customProt" class="cal-input" placeholder="0">
+                </div>
+                <div>
+                    <label class="card-tag">CARBS (G)</label>
+                    <input type="number" id="customCarbs" class="cal-input" placeholder="0">
+                </div>
+                <div>
+                    <label class="card-tag">FATS (G)</label>
+                    <input type="number" id="customFats" class="cal-input" placeholder="0">
+                </div>
+            </div>
+
+            <button class="btn-action" style="margin-top: 30px;" onclick="submitCustomFood()">SYNC MANUAL ENTRY</button>
+            <button class="btn-action" style="background:var(--bg-subtle); color:#000; margin-top:10px;" onclick="cancelCustom()">BACK TO SEARCH</button>
+        </div>
+
+        <div id="portionControl">
+            <div class="nyx-sheet-header">
+                <h2 id="selectedFoodName" class="nyx-sheet-title">Item</h2>
+                <p class="nyx-sheet-desc">Adjust serving portion</p>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin: 20px 0; background: var(--bg-subtle); padding: 20px; border-radius: 20px;">
+                <div id="displayWeight" style="font-size: 2.2rem; font-weight: 900;">100g</div>
+                <div style="text-align: right;">
+                    <div id="prevCals" style="font-size: 1.5rem; font-weight: 900;">0</div>
+                    <div class="card-tag">KCAL</div>
+                </div>
+            </div>
+            <input type="range" id="portionSlider" min="10" max="1000" step="10" value="100" style="width:100%; accent-color:#000; margin-bottom: 30px;" oninput="updatePortion(this.value)">
+            <button class="btn-action" onclick="submitPortion()">DEPLOY FUEL</button>
+            <button class="btn-action" style="background:var(--bg-subtle); color:#000; margin-top:10px;" onclick="cancelPortion()">CANCEL</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let currentMeal = 'Breakfast';
+    let nutritionData = null;
+    let selectedFood = null;
+
+    async function fetchNutrition() {
+        try {
+            const res = await fetch('/api/nutrition/data');
+            nutritionData = await res.json();
+            renderUI();
+        } catch (err) { console.error(err); }
+    }
+
+    function renderUI() {
+        const { totals, targets, progression, meals } = nutritionData;
+        
+        // Ring & Calorie Center
+        const rem = Math.max(0, targets.calories - Math.round(totals.calories));
+        document.getElementById('remainingCals').innerText = rem;
+        const pct = Math.min(100, (totals.calories / targets.calories) * 100);
+        const circle = document.getElementById('mainRing');
+        const r = circle.getAttribute('r');
+        const c = 2 * Math.PI * r;
+        circle.style.strokeDasharray = `${c} ${c}`;
+        circle.style.strokeDashoffset = c - (pct / 100) * c;
+
+        // Stats Grid
+        document.getElementById('waterVal').innerText = `${totals.water.toFixed(1)}L`;
+        document.getElementById('totalCals').innerText = Math.round(totals.calories);
+        document.getElementById('tdeeVal').innerText = targets.calories; // Using target as metabolic base
+        document.getElementById('nutriGoal').innerText = progression.goal;
+        document.getElementById('nutriWeek').innerText = `Week ${progression.week}`;
+
+        // Status Badge
+        const protPct = (totals.protein / targets.protein) * 100;
+        const status = document.getElementById('protocolStatus');
+        if (protPct < 50) {
+            status.innerText = "Status: Protein Deficit";
+            status.style.background = "var(--accent-blue)";
+        } else if (totals.calories > targets.calories) {
+            status.innerText = "Status: Caloric Surplus";
+            status.style.background = "var(--accent-red)";
+        } else {
+            status.innerText = "Status: Protocol Synchronized";
+            status.style.background = "var(--accent-green)";
+        }
+
+        // Meal Summaries
+        ['breakfast', 'lunch', 'dinner', 'snacks'].forEach(m => {
+            const sum = (meals[m] || []).reduce((acc, item) => acc + item.calories, 0);
+            document.getElementById(`sum-${m}`).innerText = `${Math.round(sum)} kcal`;
+        });
+    }
+
+    window.openSearch = (meal) => {
+        currentMeal = meal;
+        document.getElementById('drawerTitle').innerText = `Log ${meal}`;
+        NYXSheet.open('searchSheet');
+        document.getElementById('foodSearch').focus();
+    };
+
+    window.closeSearch = () => {
+        NYXSheet.close();
+        cancelPortion();
+        cancelCustom();
+    };
+
+    window.openCustomView = () => {
+        document.getElementById('searchView').style.display = 'none';
+        document.getElementById('customFoodView').style.display = 'flex';
+    };
+
+    window.cancelCustom = () => {
+        document.getElementById('customFoodView').style.display = 'none';
+        document.getElementById('searchView').style.display = 'block';
+    };
+
+    window.submitCustomFood = async () => {
+        const payload = {
+            name: document.getElementById('customName').value || "Manual Entry",
+            meal_type: currentMeal,
+            calories: parseInt(document.getElementById('customCals').value || 0),
+            protein: parseFloat(document.getElementById('customProt').value || 0),
+            carbs: parseFloat(document.getElementById('customCarbs').value || 0),
+            fats: parseFloat(document.getElementById('customFats').value || 0)
+        };
+
+        const res = await fetch('/api/nutrition/add', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        if (res.ok) { closeSearch(); fetchNutrition(); showNotify("Manual Fuel Logged", "success"); }
+    };
+
+    let searchTimeout;
+    window.handleSearch = (query) => {
+        clearTimeout(searchTimeout);
+        if (!query) return;
+        searchTimeout = setTimeout(async () => {
+            const res = await fetch(`/api/nutrition/search?q=${query}`);
+            const data = await res.json();
+            renderResults(data);
+        }, 300);
+    };
+
+    function renderResults(results) {
+        const area = document.getElementById('searchResults');
+        area.innerHTML = '';
+        results.forEach(food => {
+            const div = document.createElement('div');
+            div.className = 'result-item';
+            div.onclick = () => {
+                selectedFood = food;
+                document.getElementById('searchView').style.display = 'none';
+                document.getElementById('portionControl').style.display = 'flex';
+                document.getElementById('selectedFoodName').innerText = food.name;
+                updatePortion(100);
+            };
+            div.innerHTML = `
+                <div style="display: flex; flex-direction: column; gap: 4px;">
+                    <span style="font-weight: 800;">${food.name}</span>
+                    <span style="font-size: 0.7rem; color: var(--text-dim); font-weight: 700;">${food.protein}g P · ${food.carbs}g C</span>
+                </div>
+                <span style="font-weight: 900;">${food.calories}</span>
+            `;
+            area.appendChild(div);
+        });
+    }
+
+    window.updatePortion = (val) => {
+        document.getElementById('displayWeight').innerText = val + 'g';
+        document.getElementById('prevCals').innerText = Math.round(selectedFood.calories * (val / 100));
+    };
+
+    window.cancelPortion = () => {
+        document.getElementById('portionControl').style.display = 'none';
+        document.getElementById('searchView').style.display = 'block';
+    };
+
+    window.submitPortion = async () => {
+        const grams = parseInt(document.getElementById('portionSlider').value);
+        const m = grams / 100;
+        const payload = {
+            name: selectedFood.name,
+            meal_type: currentMeal,
+            calories: Math.round(selectedFood.calories * m),
+            protein: parseFloat((selectedFood.protein * m).toFixed(1)),
+            carbs: parseFloat((selectedFood.carbs * m).toFixed(1)),
+            fats: parseFloat((selectedFood.fats * m).toFixed(1))
+        };
+        const res = await fetch('/api/nutrition/add', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        if (res.ok) { closeSearch(); fetchNutrition(); showNotify("Fuel Logged", "success"); }
+    };
+
+    window.addWater = async (amount) => {
+        const res = await fetch('/api/nutrition/water', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ amount })
+        });
+        if (res.ok) fetchNutrition();
+    };
+
+    // Keyboard Avoidance
+    if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', () => {
+            const drawer = document.querySelector('.search-drawer');
+            const offset = window.innerHeight - window.visualViewport.height;
+            if (offset > 0) drawer.style.transform = `translateY(-${offset}px)`;
+            else drawer.style.transform = 'translateY(0)';
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', fetchNutrition);
+</script>
+{% endblock %}

@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Profile Setup | NYXFT</title>
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800;900&display=swap" rel="stylesheet">
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="theme-color" content="#000000">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="/static/img/icon-192.png">
+    <style>
+        :root {
+            --accent-blue: #007AFF;
+            --accent-red: #FF453A;
+            --text-main: #000000;
+            --text-dim: #8E8E93;
+            --bg-primary: #FFFFFF;
+            --bg-subtle: #F2F2F7;
+            --border-light: rgba(0,0,0,0.05);
+            --card-radius: 28px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        body {
+            background-color: var(--bg-primary);
+            color: var(--text-main);
+            height: 100vh;
+            width: 100vw;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* ════ BACKGROUND ════ */
+        .bg-grid {
+            position: absolute; inset: 0;
+            background-image: linear-gradient(rgba(0,0,0,0.02) 1px, transparent 1px),
+                              linear-gradient(90deg, rgba(0,0,0,0.02) 1px, transparent 1px);
+            background-size: 80px 80px; z-index: -1;
+        }
+
+        /* ════ HEADER ════ */
+        .setup-nav {
+            display: flex; justify-content: space-between; align-items: flex-start;
+            padding: 30px 20px; z-index: 10;
+        }
+
+        .brand-logo { font-size: 1.2rem; font-weight: 900; letter-spacing: -1px; text-decoration: none; color: #000; }
+        .brand-logo span { color: var(--accent-red); }
+
+        .progress-box { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+        .prog-text { font-size: 0.6rem; font-weight: 900; letter-spacing: 2px; color: var(--accent-blue); text-transform: uppercase; }
+        .prog-dots { display: flex; gap: 6px; }
+        .prog-dot { width: 30px; height: 5px; background: var(--bg-subtle); border-radius: 10px; transition: 0.3s; }
+        .prog-dot.active { background: #000; }
+
+        /* ════ MAIN CONTENT ════ */
+        .setup-main {
+            flex: 1; display: flex; flex-direction: column; align-items: center;
+            padding: 0 20px; width: 100%; max-width: 450px; margin: 0 auto;
+            position: relative; z-index: 5; overflow-y: auto; scrollbar-width: none;
+        }
+        .setup-main::-webkit-scrollbar { display: none; }
+
+        .setup-header { text-align: center; margin-bottom: 40px; }
+        .setup-title { font-size: 2.2rem; font-weight: 900; line-height: 1; letter-spacing: -2px; margin-bottom: 12px; }
+        .setup-desc { font-size: 0.95rem; color: var(--text-dim); font-weight: 600; line-height: 1.4; max-width: 300px; margin: 0 auto; }
+
+        /* ════ FORM ════ */
+        .wizard-form { width: 100%; }
+        .step-panel { display: none; flex-direction: column; gap: 20px; animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        .step-panel.active { display: flex; }
+
+        .input-group { display: flex; flex-direction: column; gap: 8px; }
+        .input-group label { font-size: 0.65rem; font-weight: 900; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-left: 4px; }
+
+        .input-wrapper {
+            position: relative; display: flex; align-items: center;
+            background: var(--bg-subtle); border-radius: 18px; padding: 0 16px;
+            transition: 0.2s; border: 2px solid transparent;
+        }
+        .input-wrapper:focus-within { background: #fff; border-color: #000; box-shadow: 0 10px 20px rgba(0,0,0,0.02); }
+        .input-wrapper input, .input-wrapper select {
+            width: 100%; padding: 18px 0 18px 12px; border: none; background: transparent;
+            font-size: 1rem; font-weight: 700; outline: none; color: #000;
+        }
+
+        /* ════ SELECTION CARDS ════ */
+        .card-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .sel-card {
+            background: var(--bg-subtle); border-radius: 20px; padding: 20px;
+            text-align: center; cursor: pointer; transition: 0.2s; border: 2px solid transparent;
+            display: flex; flex-direction: column; align-items: center; gap: 10px;
+        }
+        .sel-card.active { background: #fff; border-color: #000; box-shadow: 0 10px 20px rgba(0,0,0,0.05); }
+        .sel-card i { font-size: 1.8rem; }
+        .sel-card span { font-size: 0.7rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0.5px; }
+
+        /* ════ ACTION ROW ════ */
+        .action-row { margin-top: 40px; width: 100%; display: flex; gap: 12px; }
+        .btn-prev {
+            flex: 0 0 64px; height: 64px; background: var(--bg-subtle); border: none;
+            border-radius: 20px; display: flex; align-items: center; justify-content: center;
+            font-size: 1.4rem; cursor: pointer; transition: 0.2s;
+        }
+        .btn-next {
+            flex: 1; height: 64px; background: #000; color: #fff; border: none;
+            border-radius: 20px; font-weight: 900; font-size: 0.85rem; letter-spacing: 1px;
+            text-transform: uppercase; display: flex; align-items: center; justify-content: center; gap: 12px;
+            cursor: pointer; transition: 0.2s;
+        }
+        .btn-next:active, .btn-prev:active { transform: scale(0.96); }
+
+        /* ════ FOOTER ════ */
+        .setup-footer { padding: 30px; text-align: center; font-size: 0.7rem; font-weight: 800; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body>
+    <div class="bg-grid"></div>
+
+    <div class="setup-nav">
+        <a href="/" class="brand-logo">NYX<span>FT</span></a>
+        <div class="progress-box">
+            <div class="prog-text" id="stepIndicator">STEP 1 OF 4</div>
+            <div class="prog-dots">
+                <div class="prog-dot active" id="dot1"></div>
+                <div class="prog-dot" id="dot2"></div>
+                <div class="prog-dot" id="dot3"></div>
+                <div class="prog-dot" id="dot4"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="setup-main">
+        <div class="setup-header">
+            <h1 class="setup-title" id="mainTitle">Initialize Profile</h1>
+            <p class="setup-desc" id="mainDesc">Tell us about your current biometric state to calibrate your experience.</p>
+        </div>
+
+        <form id="setupForm" class="wizard-form">
+            <!-- STEP 1: IDENTITY -->
+            <div class="step-panel active" id="panel1">
+                <div class="input-group">
+                    <label>Assigned Handle</label>
+                    <div class="input-wrapper">
+                        <i class="ph-bold ph-user"></i>
+                        <input type="text" id="nickname" placeholder="e.g. Ghost, Alpha-1" required>
+                    </div>
+                </div>
+                <div class="input-group">
+                    <label>Biological Gender</label>
+                    <div class="input-wrapper">
+                        <i class="ph-bold ph-gender-intersex"></i>
+                        <select id="gender" required>
+                            <option value="male">Male</option>
+                            <option value="female">Female</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- STEP 2: BIOMETRICS -->
+            <div class="step-panel" id="panel2">
+                <div class="input-group">
+                    <label>Current Mass (KG)</label>
+                    <div class="input-wrapper">
+                        <i class="ph-bold ph-scales"></i>
+                        <input type="number" id="weight" step="0.1" placeholder="00.0" required>
+                    </div>
+                </div>
+                <div class="input-group">
+                    <label>Height (CM)</label>
+                    <div class="input-wrapper">
+                        <i class="ph-bold ph-ruler"></i>
+                        <input type="number" id="height" placeholder="180" required>
+                    </div>
+                </div>
+            </div>
+
+            <!-- STEP 3: MISSION -->
+            <div class="step-panel" id="panel3">
+                <div class="input-group">
+                    <label>Operational Objective</label>
+                    <div class="card-grid">
+                        <div class="sel-card active" onclick="setGoal(this, 'Bulk')">
+                            <i class="ph-bold ph-trend-up"></i>
+                            <span>Bulk</span>
+                        </div>
+                        <div class="sel-card" onclick="setGoal(this, 'Cut')">
+                            <i class="ph-bold ph-trend-down"></i>
+                            <span>Cut</span>
+                        </div>
+                        <div class="sel-card" onclick="setGoal(this, 'Maintain')">
+                            <i class="ph-bold ph-equals"></i>
+                            <span>Maintain</span>
+                        </div>
+                        <div class="sel-card" onclick="setGoal(this, 'Recomp')">
+                            <i class="ph-bold ph-arrows-clockwise"></i>
+                            <span>Recomp</span>
+                        </div>
+                    </div>
+                    <input type="hidden" id="goal" value="Bulk">
+                </div>
+            </div>
+
+            <!-- STEP 4: PROTOCOL -->
+            <div class="step-panel" id="panel4">
+                <div class="input-group">
+                    <label>Current Age</label>
+                    <div class="input-wrapper">
+                        <i class="ph-bold ph-calendar"></i>
+                        <input type="number" id="age" placeholder="25" required>
+                    </div>
+                </div>
+                <div class="input-group">
+                    <label>Activity Coefficient</label>
+                    <div class="input-wrapper">
+                        <i class="ph-bold ph-lightning"></i>
+                        <select id="activity" required>
+                            <option value="sedentary">Sedentary</option>
+                            <option value="light">Light Activity</option>
+                            <option value="moderate">Moderate Activity</option>
+                            <option value="active">Highly Active</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="action-row">
+                <button type="button" class="btn-prev" id="prevBtn" onclick="move(-1)" style="display:none;"><i class="ph-bold ph-caret-left"></i></button>
+                <button type="button" class="btn-next" id="nextBtn" onclick="move(1)">Deploy Profile <i class="ph-bold ph-arrow-right"></i></button>
+            </div>
+        </form>
+    </div>
+
+    <div class="setup-footer">
+        SECURE PROTOCOL INITIALIZATION // NYXFT
+    </div>
+
+    <script src="{{ url_for('static', filename='client/js/app.js') }}"></script>
+    <script>
+        let step = 1;
+        const total = 4;
+
+        function move(n) {
+            if (n === 1 && step === total) { submit(); return; }
+            step += n;
+            update();
+        }
+
+        function update() {
+            document.querySelectorAll('.step-panel').forEach((p, i) => p.classList.toggle('active', i+1 === step));
+            document.querySelectorAll('.prog-dot').forEach((d, i) => d.classList.toggle('active', i+1 <= step));
+            
+            document.getElementById('stepIndicator').innerText = `STEP ${step} OF ${total}`;
+            document.getElementById('prevBtn').style.display = step === 1 ? 'none' : 'flex';
+            document.getElementById('nextBtn').innerHTML = step === total ? 'Complete Deployment <i class="ph-bold ph-check"></i>' : 'Continue <i class="ph-bold ph-arrow-right"></i>';
+
+            const titles = ["Initialize Profile", "Biometric State", "Mission Objective", "Final Calibration"];
+            const descs = ["Tell us about your current biometric state to calibrate your experience.",
+                           "Enter your physical metrics for baseline calculations.",
+                           "What is your primary operational target for this training cycle?",
+                           "Finalize your profile to generate your custom performance protocol."];
+            
+            document.getElementById('mainTitle').innerText = titles[step-1];
+            document.getElementById('mainDesc').innerText = descs[step-1];
+        }
+
+        function setGoal(el, val) {
+            document.querySelectorAll('.sel-card').forEach(c => c.classList.remove('active'));
+            el.classList.add('active');
+            document.getElementById('goal').value = val;
+        }
+
+        async function submit() {
+            const btn = document.getElementById('nextBtn');
+            btn.innerHTML = 'SYNCING...';
+            btn.disabled = true;
+
+            const payload = {
+                nickname: document.getElementById('nickname').value,
+                gender: document.getElementById('gender').value,
+                weight: document.getElementById('weight').value,
+                height: document.getElementById('height').value,
+                goal: document.getElementById('goal').value,
+                age: document.getElementById('age').value
+            };
+
+            const res = await fetch('/api/profile', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            });
+
+            if (res.ok) window.location.href = '/dashboard';
+            else { btn.innerHTML = 'RETRY'; btn.disabled = false; }
+        }
+    </script>
+</body>
+</html>

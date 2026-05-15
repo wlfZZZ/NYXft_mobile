@@ -1,0 +1,599 @@
+{% extends "client/base_portal.html" %}
+
+{% block title %}System Settings | NYXFT{% endblock %}
+
+{% set active_page = 'settings' %}
+
+{% block extra_css %}
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800;900&display=swap" rel="stylesheet">
+<style>
+    :root {
+        --accent-blue: #007AFF;
+        --accent-red: #FF3B30;
+        --text-main: #000000;
+        --text-dim: #8E8E93;
+        --bg-primary: #FFFFFF;
+        --bg-subtle: #F2F2F7;
+        --border-light: rgba(0,0,0,0.05);
+        --card-radius: 28px;
+        --btn-radius: 18px;
+        --safe-bottom: 120px;
+    }
+
+    body {
+        background-color: var(--bg-primary);
+        color: var(--text-main);
+        font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+        -webkit-font-smoothing: antialiased;
+        overflow-x: hidden;
+    }
+
+    .settings-container {
+        padding: 160px 20px var(--safe-bottom) 20px;
+        max-width: 600px;
+        margin: 0 auto;
+    }
+
+    /* ════ PREMIUM HEADER ════ */
+    .mobile-settings-header {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        background: rgba(255, 255, 255, 0.9);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        z-index: 1000;
+        padding: 24px 20px 20px 20px;
+        border-bottom: 1px solid var(--border-light);
+    }
+
+    .brand-tag { 
+        font-size: 0.6rem; 
+        font-weight: 900; 
+        letter-spacing: 2px; 
+        color: var(--accent-blue); 
+        text-transform: uppercase; 
+        margin-bottom: 8px; 
+    }
+    .main-title { 
+        font-size: 2.2rem; 
+        font-weight: 900; 
+        letter-spacing: -1px; 
+        margin: 0; 
+    }
+
+    /* ════ CONFIGURATION MODULES ════ */
+    .config-stack {
+        display: flex;
+        flex-direction: column;
+        gap: 25px;
+    }
+
+    .config-module {
+        background: white;
+        border: 1px solid var(--border-light);
+        padding: 30px;
+        border-radius: var(--card-radius);
+        box-shadow: 0 10px 30px rgba(0,0,0,0.02);
+    }
+
+    .mod-tag { 
+        font-size: 0.6rem; 
+        font-weight: 900; 
+        color: var(--accent-blue); 
+        letter-spacing: 1px; 
+        text-transform: uppercase; 
+        margin-bottom: 10px; 
+    }
+    .mod-title { 
+        font-size: 1.5rem; 
+        font-weight: 900; 
+        letter-spacing: -0.5px; 
+        margin-bottom: 25px; 
+    }
+
+    .field-group { margin-bottom: 20px; }
+    .field-group label { 
+        display: block; 
+        font-size: 0.65rem; 
+        font-weight: 800; 
+        color: var(--text-dim); 
+        text-transform: uppercase; 
+        letter-spacing: 1px; 
+        margin-bottom: 8px; 
+    }
+
+    .cal-input {
+        width: 100%; 
+        background: var(--bg-subtle); 
+        border: none; 
+        border-radius: 14px;
+        font-size: 1rem; 
+        font-weight: 700; 
+        outline: none; 
+        padding: 15px; 
+        transition: 0.3s;
+        box-sizing: border-box;
+    }
+    .cal-input:focus { background: #E5E5EA; }
+
+    /* ════ FITNESS SUMMARY ════ */
+    .fitness-summary {
+        background: var(--bg-subtle);
+        padding: 20px;
+        border-radius: 18px;
+        margin-top: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+    .summary-item { display: flex; justify-content: space-between; align-items: center; }
+    .summary-label { font-size: 0.65rem; font-weight: 800; color: var(--text-dim); text-transform: uppercase; }
+    .summary-val { font-size: 1rem; font-weight: 900; }
+
+    /* ════ BUTTONS ════ */
+    .btn-action {
+        background: var(--text-main); 
+        color: white; 
+        border: none; 
+        padding: 18px; 
+        border-radius: 18px;
+        font-weight: 900; 
+        font-size: 0.85rem; 
+        letter-spacing: 0.5px; 
+        cursor: pointer; 
+        transition: 0.2s; 
+        width: 100%;
+        margin-top: 10px;
+    }
+    .btn-action:active { transform: scale(0.97); }
+
+    .status-msg {
+        font-size: 0.7rem; 
+        font-weight: 800; 
+        text-align: center; 
+        margin-top: 15px; 
+        opacity: 0; 
+        transition: 0.4s;
+    }
+    .status-msg.visible { opacity: 1; }
+    .error-msg { color: var(--accent-red); }
+    .success-msg { color: var(--accent-blue); }
+
+    .forgot-link { 
+        font-size: 0.7rem; 
+        font-weight: 800; 
+        color: var(--text-dim); 
+        text-decoration: none; 
+        display: inline-block; 
+        margin-top: 15px; 
+        text-transform: uppercase; 
+    }
+
+    .btn-purge {
+        background: transparent; 
+        color: var(--accent-red); 
+        border: 2px solid var(--accent-red);
+        padding: 15px; 
+        border-radius: 16px; 
+        font-weight: 900; 
+        font-size: 0.75rem; 
+        cursor: pointer; 
+        width: 100%;
+        margin-top: 20px;
+    }
+
+    /* Security Status Card */
+    .security-status-card {
+        background: var(--bg-subtle);
+        border-radius: 24px;
+        padding: 24px;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 20px;
+        transition: 0.3s;
+        border: 2px solid transparent;
+    }
+    .security-status-card.active {
+        background: #fff;
+        border-color: #32D74B;
+        box-shadow: 0 10px 30px rgba(50, 215, 75, 0.1);
+    }
+    .status-icon {
+        width: 48px; height: 48px; border-radius: 14px;
+        background: #000; color: #fff;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 1.5rem;
+    }
+    .security-status-card.active .status-icon { background: #32D74B; }
+    .status-info { flex: 1; }
+    .status-label { font-size: 0.6rem; font-weight: 900; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
+    .status-title { font-size: 1.1rem; font-weight: 900; margin: 2px 0; }
+    .status-desc { font-size: 0.75rem; color: var(--text-dim); font-weight: 600; }
+    .btn-setup-pin {
+        background: #000; color: #fff; border: none; padding: 12px 16px;
+        border-radius: 12px; font-weight: 900; font-size: 0.7rem; letter-spacing: 1px;
+        cursor: pointer;
+    }
+
+    /* PIN Modal - LIGHT TACTICAL REDESIGN */
+    .pin-modal {
+        position: fixed; inset: 0; 
+        background-color: rgba(255, 255, 255, 0.95);
+        background-image: 
+            linear-gradient(rgba(0,0,0,0.03) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(0,0,0,0.03) 1px, transparent 1px);
+        background-size: 30px 30px;
+        backdrop-filter: blur(15px); 
+        -webkit-backdrop-filter: blur(15px);
+        z-index: 2000;
+        display: none; align-items: center; justify-content: center;
+        animation: modalFadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        color: #000;
+    }
+    .pin-modal.active { display: flex; }
+    
+    .pin-modal-content {
+        width: 100%; max-width: 340px; text-align: center;
+        display: flex; flex-direction: column; align-items: center;
+        padding: 20px;
+    }
+
+    .wizard-icon {
+        font-size: 2.5rem; color: #007AFF;
+        filter: drop-shadow(0 5px 15px rgba(0, 122, 255, 0.2));
+        margin-bottom: 20px;
+    }
+
+    .pin-modal h2 { 
+        font-weight: 900; font-size: 1.6rem; letter-spacing: -0.5px; 
+        margin: 0 0 8px; color: #000;
+    }
+    .pin-modal p { 
+        font-size: 0.85rem; color: rgba(0,0,0,0.5); 
+        font-weight: 600; margin-bottom: 40px; 
+        letter-spacing: 0.3px;
+    }
+
+    /* PIN SLOTS */
+    .pin-dots { display: flex; gap: 12px; margin-bottom: 50px; }
+    .pin-dot { 
+        width: 40px; height: 3px; 
+        background: rgba(0,0,0,0.05); 
+        border-radius: 4px; 
+        transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
+    }
+    .pin-dot.filled { 
+        background: #000; 
+        height: 6px;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    }
+    .pin-dots.shake { animation: hapticShake 0.4s ease; }
+
+    /* LIGHT GLASS NUMPAD */
+    .numpad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; width: 100%; }
+    .num-btn {
+        width: 72px; height: 72px; border-radius: 50%; 
+        background: rgba(0,0,0,0.03);
+        border: 1px solid rgba(0,0,0,0.05);
+        display: flex; align-items: center; justify-content: center;
+        font-size: 1.6rem; font-weight: 600; cursor: pointer; 
+        transition: all 0.2s ease;
+        color: #000;
+    }
+    .num-btn.action { 
+        background: transparent; border: none;
+        font-size: 0.65rem; font-weight: 800; 
+        letter-spacing: 2px; color: rgba(0,0,0,0.4); 
+    }
+    .num-btn:active { 
+        background: #000; color: #fff; 
+        transform: scale(0.9);
+        box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+    }
+
+    @keyframes modalFadeIn { from { opacity: 0; transform: scale(1.1); } to { opacity: 1; transform: scale(1); } }
+    @keyframes hapticShake {
+        0%, 100% { transform: translateX(0); }
+        25% { transform: translateX(-10px); }
+        75% { transform: translateX(10px); }
+    }
+
+    @media (min-width: 1025px) {
+        .settings-container { max-width: 800px; padding-top: 180px; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="mobile-settings-header">
+    <div class="brand-tag">SYSTEM CALIBRATION // NYXFT</div>
+    <h1 class="main-title">Settings</h1>
+</div>
+
+<div class="settings-container">
+    <div class="config-stack">
+        
+        <!-- MODULE 1: PERSONNEL -->
+        <div class="config-module">
+            <div class="mod-tag">Identity Matrix</div>
+            <h3 class="mod-title">Personnel Calibration</h3>
+            
+            <div class="field-group">
+                <label>System Nickname</label>
+                <input type="text" id="nickname" class="cal-input" value="{{ user.nickname }}">
+            </div>
+
+            <div class="field-group">
+                <label>Mission Goal</label>
+                <select id="goal" class="cal-input" onchange="updateSummary()">
+                    <option value="Bulk" {{ 'selected' if user.goal == 'Bulk' }}>Bulk Protocol</option>
+                    <option value="Cut" {{ 'selected' if user.goal == 'Cut' }}>Cut Protocol</option>
+                    <option value="Maintain" {{ 'selected' if user.goal == 'Maintain' }}>Maintain Protocol</option>
+                </select>
+            </div>
+
+            <div class="field-group">
+                <label>Target Mass (KG)</label>
+                <input type="number" id="targetWeight" class="cal-input" value="{{ user.weight }}" oninput="updateSummary()">
+            </div>
+
+            <div class="fitness-summary" id="fitnessSummary">
+                <div class="summary-item">
+                    <span class="summary-label">Daily Calories</span>
+                    <span class="summary-val" id="sumCals">-- kcal</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Protein Target</span>
+                    <span class="summary-val" id="sumProt">--g</span>
+                </div>
+            </div>
+
+            <button onclick="updateSettings()" class="btn-action" style="margin-top: 30px;">SYNC CONFIGURATION</button>
+            <div id="statusMsg" class="status-msg">CONFIGURATION SAVED</div>
+        </div>
+
+        <!-- MODULE 2: SECURITY -->
+        <div class="config-module">
+            <div class="mod-tag">Security Uplink</div>
+            <h3 class="mod-title">Security Protocol</h3>
+            
+            <!-- SECURITY STATUS CARD -->
+            <div id="pinStatusCard" class="security-status-card">
+                <div class="status-icon"><i class="ph-bold ph-shield-check"></i></div>
+                <div class="status-info">
+                    <div class="status-label">Access Level</div>
+                    <div id="statusTitle" class="status-title">Standard Protection</div>
+                    <div id="statusDesc" class="status-desc">Unlock using master email and passcode.</div>
+                </div>
+                <button type="button" class="btn-setup-pin" onclick="openPinWizard()">SET UP PIN</button>
+            </div>
+
+            <div class="field-group" style="margin-top: 30px;">
+                <label>Current Passcode</label>
+                <input type="password" id="oldPass" class="cal-input" placeholder="••••••••">
+            </div>
+            <div class="field-group">
+                <label>New Passcode</label>
+                <input type="password" id="newPass" class="cal-input" placeholder="••••••••">
+            </div>
+            
+            <div style="height: 20px;"></div>
+        </div>
+
+        <!-- PIN SETUP WIZARD MODAL -->
+        <div id="pinWizard" class="pin-modal">
+            <div class="pin-modal-content">
+                <div class="wizard-icon"><i class="ph-bold ph-fingerprint"></i></div>
+                <h2 id="wizardTitle">Set Access PIN</h2>
+                <p id="wizardDesc">Enter a 4-digit code for instant access.</p>
+                
+                <div class="pin-dots" id="wizardDots">
+                    <div class="pin-dot"></div>
+                    <div class="pin-dot"></div>
+                    <div class="pin-dot"></div>
+                    <div class="pin-dot"></div>
+                </div>
+
+                <div class="numpad">
+                    <div class="num-btn" onclick="wizardPress('1')">1</div>
+                    <div class="num-btn" onclick="wizardPress('2')">2</div>
+                    <div class="num-btn" onclick="wizardPress('3')">3</div>
+                    <div class="num-btn" onclick="wizardPress('4')">4</div>
+                    <div class="num-btn" onclick="wizardPress('5')">5</div>
+                    <div class="num-btn" onclick="wizardPress('6')">6</div>
+                    <div class="num-btn" onclick="wizardPress('7')">7</div>
+                    <div class="num-btn" onclick="wizardPress('8')">8</div>
+                    <div class="num-btn" onclick="wizardPress('9')">9</div>
+                    <div class="num-btn action" onclick="closePinWizard()">CANCEL</div>
+                    <div class="num-btn" onclick="wizardPress('0')">0</div>
+                    <div class="num-btn action" onclick="wizardPress('back')"><i class="ph-bold ph-backspace"></i></div>
+                </div>
+            </div>
+        </div>
+
+            <div class="field-group">
+                <label>Confirm New</label>
+                <input type="password" id="confPass" class="cal-input" placeholder="••••••••">
+            </div>
+
+            <a href="{{ url_for('forgot_password') }}" class="forgot-link">Recover Passcode</a>
+
+            <button onclick="updateSecurity()" class="btn-action" style="margin-top: 30px;">UPDATE SECURITY</button>
+            <div id="securityMsg" class="status-msg">SECURITY SYNCED</div>
+            
+            <div style="margin-top: 40px; border-top: 1px solid var(--border-light); padding-top: 30px;">
+                <div class="mod-tag">Data Management</div>
+                <button class="btn-purge" onclick="confirmPurge()">PURGE SYSTEM DATA</button>
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function updateSummary() {
+        const goal = document.getElementById('goal').value;
+        const weight = parseFloat(document.getElementById('targetWeight').value) || 0;
+        if (weight <= 0) return;
+        let cals = goal === 'Bulk' ? Math.round(weight * 35) : (goal === 'Cut' ? Math.round(weight * 28) : Math.round(weight * 31));
+        document.getElementById('sumCals').innerText = `${cals} kcal`;
+        document.getElementById('sumProt').innerText = `${Math.round(weight * 2.2)}g`;
+    }
+
+    // --- REDESIGNED PIN LOGIC ---
+    let wizardMode = 'enter'; // enter, confirm
+    let tempPin = '';
+    let confirmPin = '';
+
+    function loadPinState() {
+        const enabled = localStorage.getItem('nyx_pin_enabled') === 'true';
+        const card = document.getElementById('pinStatusCard');
+        const title = document.getElementById('statusTitle');
+        const desc = document.getElementById('statusDesc');
+        const btn = card.querySelector('.btn-setup-pin');
+
+        if (enabled) {
+            card.classList.add('active');
+            title.innerText = "Tactical Protection";
+            desc.innerText = "Secured via Instant Uplink PIN.";
+            btn.innerText = "RESET PIN";
+        } else {
+            card.classList.remove('active');
+            title.innerText = "Standard Protection";
+            desc.innerText = "Unlock using master email and passcode.";
+            btn.innerText = "SET UP PIN";
+        }
+    }
+
+    function openPinWizard() {
+        wizardMode = 'enter';
+        tempPin = '';
+        confirmPin = '';
+        document.getElementById('wizardTitle').innerText = "Set Access PIN";
+        document.getElementById('wizardDesc').innerText = "Enter a 4-digit code for instant access.";
+        updateWizardDots();
+        document.getElementById('pinWizard').classList.add('active');
+    }
+
+    function closePinWizard() {
+        document.getElementById('pinWizard').classList.remove('active');
+    }
+
+    function wizardPress(val) {
+        let target = wizardMode === 'enter' ? tempPin : confirmPin;
+        
+        if (val === 'back') {
+            target = target.slice(0, -1);
+        } else if (target.length < 4) {
+            target += val;
+        }
+
+        if (wizardMode === 'enter') tempPin = target; else confirmPin = target;
+        updateWizardDots();
+
+        if (target.length === 4) {
+            if (wizardMode === 'enter') {
+                setTimeout(() => {
+                    wizardMode = 'confirm';
+                    document.getElementById('wizardTitle').innerText = "Confirm PIN";
+                    document.getElementById('wizardDesc').innerText = "Re-enter your code to verify.";
+                    updateWizardDots();
+                }, 300);
+            } else {
+                // Finalize
+                if (tempPin === confirmPin) {
+                    saveFinalPin(tempPin);
+                } else {
+                    const dotsRow = document.getElementById('wizardDots');
+                    dotsRow.classList.add('shake');
+                    setTimeout(() => {
+                        dotsRow.classList.remove('shake');
+                        showNotify("PINs DO NOT MATCH", "error");
+                        openPinWizard(); // Reset
+                    }, 400);
+                }
+            }
+        }
+    }
+
+    function updateWizardDots() {
+        const target = wizardMode === 'enter' ? tempPin : confirmPin;
+        const dots = document.getElementById('wizardDots').querySelectorAll('.pin-dot');
+        dots.forEach((d, i) => d.classList.toggle('filled', i < target.length));
+    }
+
+    function saveFinalPin(pin) {
+        localStorage.setItem('nyx_pin', pin);
+        localStorage.setItem('nyx_pin_enabled', 'true');
+        showNotify("PIN ENROLLED", "success");
+        closePinWizard();
+        loadPinState();
+    }
+
+    async function updateSettings() {
+        const statusMsg = document.getElementById('statusMsg');
+        const data = {
+            nickname: document.getElementById('nickname').value,
+            goal: document.getElementById('goal').value,
+            weight: document.getElementById('targetWeight').value
+        };
+
+        const res = await fetch('/api/settings/update', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+
+        if (res.ok) {
+            statusMsg.innerText = "CONFIGURATION SAVED";
+            statusMsg.className = "status-msg success-msg visible";
+            setTimeout(() => statusMsg.classList.remove('visible'), 2000);
+        }
+    }
+
+    async function updateSecurity() {
+        const securityMsg = document.getElementById('securityMsg');
+        const oldP = document.getElementById('oldPass').value;
+        const newP = document.getElementById('newPass').value;
+        const confP = document.getElementById('confPass').value;
+
+        if (!oldP || !newP || !confP) {
+            securityMsg.innerText = "ALL FIELDS REQUIRED";
+            securityMsg.className = "status-msg error-msg visible";
+            setTimeout(() => securityMsg.classList.remove('visible'), 3000);
+            return;
+        }
+
+        const res = await fetch('/api/settings/security', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ old_pass: oldP, new_pass: newP, conf_pass: confP })
+        });
+
+        const data = await res.json();
+        if (res.ok) {
+            securityMsg.innerText = "SECURITY SYNCED";
+            securityMsg.className = "status-msg success-msg visible";
+            document.getElementById('oldPass').value = '';
+            document.getElementById('newPass').value = '';
+            document.getElementById('confPass').value = '';
+        } else {
+            securityMsg.innerText = data.error || "SYNC FAILED";
+            securityMsg.className = "status-msg error-msg visible";
+        }
+        setTimeout(() => securityMsg.classList.remove('visible'), 3000);
+    }
+
+    function confirmPurge() {
+        if (confirm("Are you sure you want to delete all records?")) showNotify("Archives Purged.", "success");
+    }
+
+    loadPinState();
+    updateSummary();
+</script>
+{% endblock %}

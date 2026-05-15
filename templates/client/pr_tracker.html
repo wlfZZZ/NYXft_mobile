@@ -1,0 +1,278 @@
+{% extends "client/base_portal.html" %}
+
+{% block title %}Strength Archive | NYXFT Intelligence{% endblock %}
+
+{% set active_page = 'pr_tracker' %}
+
+{% block extra_css %}
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800;900&display=swap" rel="stylesheet">
+<style>
+    :root {
+        --accent-blue: #007AFF;
+        --accent-red: #FF453A;
+        --text-main: #000000;
+        --text-dim: #8E8E93;
+        --bg-primary: #FFFFFF;
+        --bg-subtle: #F2F2F7;
+        --border-light: rgba(0,0,0,0.05);
+        --card-radius: 28px;
+        --safe-bottom: 120px;
+    }
+
+    body {
+        background-color: var(--bg-primary);
+        color: var(--text-main);
+        font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+        -webkit-font-smoothing: antialiased;
+        overflow-x: hidden;
+    }
+
+    .pr-container {
+        padding: 160px 20px var(--safe-bottom) 20px;
+        max-width: 600px;
+        margin: 0 auto;
+    }
+
+    /* ════ PREMIUM STICKY HEADER ════ */
+    .mobile-pr-header {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        background: rgba(255, 255, 255, 0.9);
+        backdrop-filter: blur(25px);
+        -webkit-backdrop-filter: blur(25px);
+        z-index: 1000;
+        padding: 24px 20px 20px 20px;
+        border-bottom: 1px solid var(--border-light);
+    }
+
+    .brand-tag { 
+        font-size: 0.6rem; 
+        font-weight: 900; 
+        letter-spacing: 2px; 
+        color: var(--accent-blue); 
+        text-transform: uppercase; 
+        margin-bottom: 8px;
+    }
+
+    .header-title { 
+        font-size: 2.2rem; 
+        font-weight: 900; 
+        letter-spacing: -1px; 
+        margin: 0; 
+    }
+
+    /* ════ HALL OF POWER: ELITE LIFTS ════ */
+    .hero-scroll {
+        display: flex;
+        gap: 15px;
+        overflow-x: auto;
+        padding-bottom: 25px;
+        scrollbar-width: none;
+        margin: 0 -20px 10px -20px;
+        padding-left: 20px;
+        padding-right: 20px;
+    }
+    .hero-scroll::-webkit-scrollbar { display: none; }
+
+    .matrix-card {
+        min-width: 160px;
+        background: #000;
+        color: #fff;
+        padding: 25px;
+        border-radius: var(--card-radius);
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+        box-shadow: 0 15px 30px rgba(0,0,0,0.1);
+    }
+
+    .card-label { font-size: 0.55rem; font-weight: 900; text-transform: uppercase; letter-spacing: 1.5px; opacity: 0.6; }
+    .card-val { font-size: 2.2rem; font-weight: 900; letter-spacing: -1px; }
+    .card-unit { font-size: 0.8rem; font-weight: 700; margin-left: 4px; opacity: 0.6; }
+
+    /* ════ RECORD DEPLOYMENT ════ */
+    .deploy-module {
+        background: var(--bg-subtle);
+        padding: 25px;
+        border-radius: var(--card-radius);
+        margin-bottom: 30px;
+    }
+
+    .mod-tag { font-size: 0.6rem; font-weight: 900; color: var(--accent-blue); text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 15px; display: block; }
+    
+    .sync-form { display: flex; flex-direction: column; gap: 15px; }
+    
+    .input-row { display: flex; gap: 10px; }
+    .input-group { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+    .input-group label { font-size: 0.6rem; font-weight: 800; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
+    
+    .pr-input {
+        background: #fff;
+        border: 1px solid var(--border-light);
+        padding: 14px 16px;
+        border-radius: 14px;
+        font-family: inherit;
+        font-weight: 800;
+        font-size: 0.95rem;
+        outline: none;
+    }
+    .pr-input:focus { border-color: var(--accent-blue); }
+
+    .btn-deploy {
+        background: #000;
+        color: #fff;
+        border: none;
+        padding: 18px;
+        border-radius: 18px;
+        font-weight: 900;
+        font-size: 0.85rem;
+        letter-spacing: 1px;
+        margin-top: 10px;
+        cursor: pointer;
+    }
+
+    /* ════ ARCHIVE LIST ════ */
+    .archive-stack { display: flex; flex-direction: column; gap: 15px; }
+    .record-card {
+        background: #fff;
+        border: 1px solid var(--border-light);
+        padding: 20px 25px;
+        border-radius: 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.01);
+    }
+
+    .rec-info { display: flex; flex-direction: column; gap: 4px; }
+    .rec-name { font-size: 1rem; font-weight: 800; }
+    .rec-meta { font-size: 0.7rem; font-weight: 700; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; }
+    
+    .rec-perf { text-align: right; display: flex; flex-direction: column; gap: 4px; }
+    .rec-val { font-size: 1.2rem; font-weight: 900; }
+    .pr-tag { font-size: 0.5rem; font-weight: 900; background: var(--accent-blue); color: #fff; padding: 3px 8px; border-radius: 4px; letter-spacing: 0.5px; }
+
+    @media (min-width: 1025px) {
+        .pr-container { max-width: 1000px; padding-top: 180px; }
+        .hero-scroll { overflow: visible; display: grid; grid-template-columns: repeat(4, 1fr); margin: 0 0 30px 0; padding: 0; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="mobile-pr-header">
+    <div class="brand-tag">STRENGTH ARCHIVE // NYX</div>
+    <h1 class="header-title">Hall of Power</h1>
+</div>
+
+<div class="pr-container">
+    <!-- ELITE LIFTS -->
+    <div class="hero-scroll">
+        {% set big_lifts = [
+            {'name': 'Squat', 'val': best_squat or 0},
+            {'name': 'Bench', 'val': best_bench or 0},
+            {'name': 'Deadlift', 'val': best_deadlift or 0},
+            {'name': 'OHP', 'val': best_ohp or 0}
+        ] %}
+        {% for lift in big_lifts %}
+        <div class="matrix-card">
+            <div class="card-label">{{ lift.name }} Architecture</div>
+            <div class="card-val">{{ lift.val }}<span class="card-unit">kg</span></div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- RECORD DEPLOYMENT -->
+    <div class="deploy-module">
+        <span class="mod-tag">Record Synchronization</span>
+        <form id="prForm" class="sync-form">
+            <div class="input-group">
+                <label>Exercise Architecture</label>
+                <input type="text" id="prExercise" class="pr-input" placeholder="e.g. Bench Press" list="exerciseList" required>
+                <datalist id="exerciseList">
+                    <option value="Bench Press">
+                    <option value="Squat">
+                    <option value="Deadlift">
+                    <option value="Overhead Press">
+                </datalist>
+            </div>
+            <div class="input-row">
+                <div class="input-group">
+                    <label>Force Load (KG)</label>
+                    <input type="number" id="prWeight" class="pr-input" step="0.5" required>
+                </div>
+                <div class="input-group">
+                    <label>Rep Count</label>
+                    <input type="number" id="prReps" class="pr-input" value="1" required>
+                </div>
+            </div>
+            <button type="submit" class="btn-deploy">DEPLOY PERFORMANCE DATA</button>
+        </form>
+    </div>
+
+    <!-- ARCHIVE FEED -->
+    <div class="archive-stack">
+        {% if prs %}
+            {% for pr in prs %}
+            <div class="record-card">
+                <div class="rec-info">
+                    <span class="rec-name">{{ pr.exercise }}</span>
+                    <span class="rec-meta">{{ pr.date }}</span>
+                </div>
+                <div class="rec-perf">
+                    <span class="rec-val">{{ pr.weight }}<span style="font-size: 0.7rem; opacity: 0.5;">kg</span></span>
+                    <div style="display: flex; gap: 6px; justify-content: flex-end; align-items: center;">
+                        <span class="rec-meta">{{ pr.reps }} Reps</span>
+                        {% if pr.is_pr %}
+                        <span class="pr-tag">RECORD</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div style="text-align: center; padding: 40px; color: var(--text-dim); font-weight: 700;">
+                Strength Archive Empty. Initialize Uplink.
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.getElementById('prForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = e.target.querySelector('.btn-deploy');
+        btn.innerText = "DEPLOYING...";
+        btn.disabled = true;
+
+        const data = {
+            exercise: document.getElementById('prExercise').value,
+            weight: document.getElementById('prWeight').value,
+            reps: document.getElementById('prReps').value
+        };
+
+        try {
+            const res = await fetch('/api/pr', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            if (res.ok) {
+                location.reload();
+            } else {
+                btn.innerText = "DEPLOY FAILED";
+                btn.disabled = false;
+            }
+        } catch (err) {
+            console.error("PR Sync failed", err);
+            btn.innerText = "SYNC ERROR";
+            btn.disabled = false;
+        }
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,186 @@
+{% extends "coach/coach_base.html" %}
+{% set active_page = 'coach_dash' %}
+{% block extra_css %}
+<style>
+    .roster-controls {
+        display: flex;
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+        align-items: center;
+    }
+    .search-uplink {
+        flex: 1;
+        position: relative;
+    }
+    .search-uplink input {
+        width: 100%;
+        background: #FFF;
+        border: 1px solid var(--coach-border);
+        padding: 0.85rem 1.25rem 0.85rem 3rem;
+        border-radius: 14px;
+        font-family: inherit;
+        font-weight: 600;
+        font-size: 0.9rem;
+        transition: 0.3s;
+    }
+    .search-uplink input:focus {
+        border-color: var(--coach-primary);
+        box-shadow: 0 0 0 4px rgba(0, 122, 255, 0.05);
+        outline: none;
+    }
+    .search-uplink i {
+        position: absolute;
+        left: 1.25rem;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--coach-text-dim);
+    }
+    
+    /* Status Engine Styles */
+    .status-badge {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.65rem;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        padding: 4px 10px;
+        border-radius: 20px;
+    }
+    .status-online { background: rgba(34, 197, 94, 0.1); color: #15803d; }
+    .status-active { background: rgba(0, 122, 255, 0.1); color: #007AFF; }
+    .status-away { background: rgba(245, 158, 11, 0.1); color: #b45309; }
+    .status-inactive { background: rgba(107, 114, 128, 0.1); color: #4b5563; }
+    
+    .status-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: currentColor;
+    }
+    
+    .trend-indicator {
+        font-size: 0.75rem;
+        font-weight: 700;
+        margin-top: 4px;
+    }
+    .trend-up { color: var(--danger); }
+    .trend-down { color: var(--success); }
+    .trend-neutral { color: var(--coach-text-dim); }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- SECTION 1: UNIT OVERVIEW -->
+<div class="stat-grid">
+    <div class="stat-card">
+        <span class="label">Total Athletes</span>
+        <div class="value">{{ roster_count }}</div>
+        <div class="trend up">+12% Signal Strength</div>
+    </div>
+    <div class="stat-card">
+        <span class="label">Active Athletes</span>
+        <div class="value">{{ roster_count }}</div>
+        <div class="trend" style="color:var(--coach-text-dim);">All Units Nominal</div>
+    </div>
+    <div class="stat-card">
+        <span class="label">Avg Consistency</span>
+        <div class="value">94.2%</div>
+        <div class="trend up">+2.1% This Week</div>
+    </div>
+</div>
+
+<!-- SECTION 2: MY ROSTER -->
+<div class="roster-header">
+    <h2>Performance Roster</h2>
+    <div style="display:flex; gap:10px;">
+        <a href="{{ url_for('coach_roster') }}" class="btn-pro primary" style="font-size:0.7rem;">View Full Roster</a>
+        <div class="btn-pro secondary" onclick="exportRoster()">Export Roster</div>
+    </div>
+</div>
+
+<div class="roster-controls">
+    <div class="search-uplink">
+        <i class="ph-bold ph-magnifying-glass"></i>
+        <input type="text" id="athleteSearch" placeholder="Search athlete name or uplink identity..." onkeyup="filterRoster()">
+    </div>
+    <select class="btn-pro secondary" style="background:#FFF; padding:0.8rem 1rem;" id="goalFilter" onchange="filterRoster()">
+        <option value="all">All Goals</option>
+        <option value="Cut">Protocol: Cut</option>
+        <option value="Bulk">Protocol: Bulk</option>
+        <option value="Maintain">Protocol: Maintain</option>
+    </select>
+</div>
+
+<div class="athlete-list" id="athleteList">
+    {% for stat in roster_stats %}
+    <div class="athlete-row" data-name="{{ stat.user.name|lower }}" data-email="{{ stat.user.email|lower }}" data-goal="{{ stat.user.nutrition_goal }}">
+        <div class="athlete-cell identity">
+            <span class="name">{{ stat.user.name }}</span>
+            <span class="email">{{ stat.user.email }}</span>
+        </div>
+        <div class="athlete-cell">
+            <div class="status-badge status-{{ stat.status }}">
+                <div class="status-dot"></div>
+                {{ stat.status }}
+            </div>
+        </div>
+        <div class="athlete-cell">
+            <div class="cell-label">Current Weight</div>
+            <div class="cell-val">{{ stat.user.weight }} kg</div>
+            {% if stat.weight_delta != 0 %}
+            <div class="trend-indicator {% if stat.weight_delta > 0 %}trend-up{% else %}trend-down{% endif %}">
+                {{ '↑' if stat.weight_delta > 0 else '↓' }} {{ stat.weight_delta|abs }} kg
+            </div>
+            {% else %}
+            <div class="trend-indicator trend-neutral">± 0.0 kg</div>
+            {% endif %}
+        </div>
+        <div class="athlete-cell">
+            <div class="cell-label">Last Activity</div>
+            <div class="cell-val">{{ stat.last_seen }}</div>
+        </div>
+        <div class="actions-group">
+            <a href="{{ url_for('coach_intelligence', user_id=stat.user.id) }}" class="btn-pro primary">View Intelligence</a>
+            <button class="btn-pro secondary" style="padding: 10px;" title="Send Signal" onclick="window.location.href='/coach/intelligence/{{ stat.user.id }}#chat'">
+                <i class="ph-bold ph-chat-centered-text"></i>
+            </button>
+        </div>
+    </div>
+    {% else %}
+    <div style="background:#FFF; padding:4rem; border-radius:12px; text-align:center; border:1px dashed var(--coach-border);">
+        <p style="color:var(--coach-text-dim); font-weight:700;">No units currently assigned to this lead command.</p>
+    </div>
+    {% endfor %}
+</div>
+
+{% block scripts %}
+<script>
+function filterRoster() {
+    const query = document.getElementById('athleteSearch').value.toLowerCase();
+    const goal = document.getElementById('goalFilter').value;
+    const rows = document.querySelectorAll('.athlete-row');
+    
+    rows.forEach(row => {
+        const name = row.getAttribute('data-name');
+        const email = row.getAttribute('data-email');
+        const athleteGoal = row.getAttribute('data-goal');
+        
+        const matchesQuery = name.includes(query) || email.includes(query);
+        const matchesGoal = goal === 'all' || athleteGoal === goal;
+        
+        if (matchesQuery && matchesGoal) {
+            row.style.display = 'grid';
+        } else {
+            row.style.display = 'none';
+        }
+    });
+}
+
+function exportRoster() {
+    window.location.href = '/admin/export_users'; // Reusing admin export for now, or we can make a coach specific one
+}
+</script>
+{% endblock %}
+{% endblock %}

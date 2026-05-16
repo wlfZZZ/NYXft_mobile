@@ -120,38 +120,8 @@ def send_async_email(app, msg):
         except Exception as e:
             print(f"[SYSTEM ALERT] Background Mail Transmission Failed: {e}")
 
-def send_pulse_code(email, code, subject="NYX OS Security Pulse"):
-    # Innovative Tactical Copy
-    html_content = f"""
-    <div style="background-color: #000; color: #fff; padding: 40px; font-family: 'Inter', sans-serif; text-align: center; border-radius: 8px;">
-        <h1 style="letter-spacing: 4px; font-weight: 800; margin-bottom: 10px; color: #fff;">NYX PERFORMANCE OS</h1>
-        <p style="color: #666; font-size: 12px; letter-spacing: 2px; margin-bottom: 40px;">// IDENTITY SYNCHRONIZATION PROTOCOL //</p>
-        
-        <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); padding: 30px; border-radius: 12px; display: inline-block; min-width: 250px;">
-            <p style="color: #888; font-size: 14px; margin-bottom: 20px; font-weight: 600;">YOUR SECURITY PULSE CODE</p>
-            <div style="font-size: 48px; font-weight: 900; letter-spacing: 12px; color: #fff; margin: 20px 0;">{code}</div>
-        </div>
-        
-        <p style="color: #444; font-size: 11px; margin-top: 40px; line-height: 1.6;">
-            This pulse is valid for the current synchronization attempt.<br>
-            If you did not initiate this uplink, secure your credentials immediately.<br>
-            <span style="color: #666;">SYSTEM STATUS: SECURE // LOCATION: CLOUD_NODE_PRIMARY</span>
-        </p>
-    </div>
-    """
-    
-    msg = Message(f"[TACTICAL UPLINK] {subject}", recipients=[email])
-    msg.html = html_content
-    msg.body = f"NYX OS Security Pulse: {code} // Identity Synchronization Active."
-    
-    # --- TACTICAL OVERRIDE (NO MAIL) ---
-    code = "111111" # Static code for temporary bypass
-    user.verification_code = code
-    db.session.commit()
-    
-    print(f"[SYSTEM OVERRIDE] Bypass Active for {email}. Code: {code}")
-    
-    return jsonify({'success': True, 'message': 'SECURITY_PULSE_DISPATCHED'})
+    # MAIL DISPATCH DISABLED FOR TACTICAL BYPASS
+    return True
 
 # --- GOOGLE OAUTH INITIALIZATION ---
 oauth = OAuth(app)
@@ -864,7 +834,8 @@ def api_auth():
         if not name:
             return jsonify({'error': 'Full name is required for signup'}), 400
             
-        v_code = ''.join(random.choices(string.digits, k=6))
+        # --- TACTICAL BYPASS (NO MAIL) ---
+        v_code = "111111"
         new_user = User(
             email=email,
             name=name,
@@ -876,18 +847,18 @@ def api_auth():
         db.session.add(new_user)
         db.session.commit()
         
-        send_pulse_code(email, v_code, "NYX OS Verification Code")
+        print(f"[SYSTEM OVERRIDE] Enrollment Pulse Active for {email}. Code: {v_code}")
         return jsonify({'success': True, 'requires_verification': True, 'email': email})
         
     elif action == 'login':
         user = User.query.filter_by(email=email).first()
         if user:
-            # Generate Login Verification Pulse
-            v_code = ''.join(random.choices(string.digits, k=6))
+            # --- TACTICAL BYPASS (NO MAIL) ---
+            v_code = "111111"
             user.verification_code = v_code
             db.session.commit()
             
-            send_pulse_code(email, v_code, "NYX OS Login Pulse")
+            print(f"[SYSTEM OVERRIDE] Security Pulse Transmitted for {email}. Code: {v_code}")
             return jsonify({'success': True, 'requires_verification': True, 'email': email, 'message': 'Security pulse transmitted.'})
         else:
             return jsonify({'error': 'Personnel Identity Not Found. Please create an account.'}), 404

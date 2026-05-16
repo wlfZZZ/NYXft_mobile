@@ -549,6 +549,22 @@ def analytics():
     user = User.query.filter_by(email=session['user']).first()
     if not user: return redirect(url_for('auth'))
     
+    # ── VITAL SIGNS TRENDS (30 Days) ──
+    biometrics = user.biometrics[-30:]
+    labels = [b.date for b in biometrics]
+    weight_history = [b.weight or 0 for b in biometrics]
+    step_history = [b.steps or 0 for b in biometrics]
+
+    # ── STRENGTH TRENDS ──
+    prs = user.prs
+    volume = {'Push': 0, 'Pull': 0, 'Legs': 0}
+    for p in prs:
+        ex = p.exercise.lower()
+        v = (p.weight or 0) * (p.reps or 1)
+        if any(x in ex for x in ['bench', 'press', 'dip']): volume['Push'] += v
+        elif any(x in ex for x in ['row', 'pull', 'curl', 'deadlift']): volume['Pull'] += v
+        elif any(x in ex for x in ['squat', 'leg', 'lunge']): volume['Legs'] += v
+
     # ── AI PREDICTIONS & CONSISTENCY ──
     consistency_data = [1 if (b.steps or 0) >= 10000 else 0 for b in biometrics]
     

@@ -100,12 +100,13 @@ app.config['SESSION_PERMANENT'] = True
 db = SQLAlchemy(app)
 
 # Email Configuration
-app.config['MAIL_SERVER'] = os.getenv("MAIL_SERVER", "smtp.gmail.com")
+app.config['MAIL_SERVER'] = os.getenv("MAIL_SERVER", "smtp.gmail.com").strip()
 app.config['MAIL_PORT'] = int(os.getenv("MAIL_PORT", 587))
-app.config['MAIL_USE_TLS'] = os.getenv("MAIL_USE_TLS", "True") == "True"
-app.config['MAIL_USERNAME'] = os.getenv("MAIL_USERNAME")
-app.config['MAIL_PASSWORD'] = os.getenv("MAIL_PASSWORD")
-app.config['MAIL_DEFAULT_SENDER'] = os.getenv("MAIL_DEFAULT_SENDER", "NYX Performance OS <verify@nyxft.com>")
+app.config['MAIL_USE_TLS'] = os.getenv("MAIL_USE_TLS", "True").strip().lower() == "true"
+app.config['MAIL_USE_SSL'] = os.getenv("MAIL_USE_SSL", "False").strip().lower() == "true"
+app.config['MAIL_USERNAME'] = os.getenv("MAIL_USERNAME", "").strip()
+app.config['MAIL_PASSWORD'] = os.getenv("MAIL_PASSWORD", "").strip()
+app.config['MAIL_DEFAULT_SENDER'] = os.getenv("MAIL_DEFAULT_SENDER", "NYX Performance OS <verify@nyxft.com>").strip()
 
 mail = Mail(app)
 

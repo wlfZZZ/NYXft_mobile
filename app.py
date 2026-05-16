@@ -116,6 +116,7 @@ def send_async_email(app, msg):
     with app.app_context():
         try:
             mail.send(msg)
+            print(f"[SYSTEM SUCCESS] Identity Handshake Transmitted to {msg.recipients[0]}")
         except Exception as e:
             print(f"[SYSTEM ALERT] Background Mail Transmission Failed: {e}")
 

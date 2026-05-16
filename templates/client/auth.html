@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>NYX Performance | Auth</title>
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/client/css/auth_replica.css">
     <style>
@@ -146,8 +146,10 @@
             </div>
 
             <div class="action-track" style="margin-top: 20px; max-width: 100%;">
-                <div class="pill-handle" id="authPill" style="width: 180px;">SLIDE TO SYNC</div>
-                <div class="track-instruction">SYNC >>></div>
+                <div class="action-thumb" id="authPill">
+                    <i class="ph-bold ph-caret-right"></i>
+                </div>
+                <div class="action-text" id="authPillLabel">SLIDE TO SYNC</div>
             </div>
 
             <p class="auth-footer" id="toggleText">New Personnel? <span onclick="toggleMode()">Create Identity</span></p>
@@ -296,8 +298,8 @@
 
         function initSlider() {
             const track = document.querySelector('.action-track');
-            const pill = document.querySelector('.pill-handle');
-            const instruct = document.querySelector('.track-instruction');
+            const pill = document.querySelector('.action-thumb');
+            const instruct = document.querySelector('.action-text');
             let isDragging = false;
             let startX = 0;
             

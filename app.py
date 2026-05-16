@@ -144,8 +144,14 @@ def send_pulse_code(email, code, subject="NYX OS Security Pulse"):
     msg.html = html_content
     msg.body = f"NYX OS Security Pulse: {code} // Identity Synchronization Active."
     
-    threading.Thread(target=send_async_email, args=(app, msg)).start()
-    print(f"[TACTICAL PULSE] Dispatching enhanced HTML code to {email}.")
+    # --- DISPATCH IDENTITY PULSE ---
+    try:
+        mail.send(msg)
+        print(f"[SYSTEM SUCCESS] Identity Handshake Transmitted to {email}")
+    except Exception as e:
+        print(f"[SYSTEM ALERT] Identity Handshake Failed: {e}")
+    
+    return jsonify({'success': True, 'message': 'SECURITY_PULSE_DISPATCHED'})
 
 # --- GOOGLE OAUTH INITIALIZATION ---
 oauth = OAuth(app)

@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Create Account</title>
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/client/css/auth_replica.css">
+</head>
+<body>
+    <!-- ════ TOAST ════ -->
+    <div id="toast" style="position: fixed; top: 50px; left: 20px; right: 20px; background: rgba(255,255,255,0.1); backdrop-filter: blur(10px); padding: 15px; border-radius: 12px; display: none; z-index: 1000; text-align: center; font-size: 0.9rem;"></div>
+
+    <header class="nav-header">
+        <button class="btn-back" onclick="window.location.href='/auth'"><i class="ph ph-caret-left"></i></button>
+        <h1 class="page-title">Sign Up</h1>
+        <div style="width: 44px;"></div>
+    </header>
+
+    <p class="auth-subtext">Initialize your performance identity. All fields required for system uplink.</p>
+
+    <div class="input-row" style="flex-direction: column; gap: 15px;">
+        <input type="text" id="nameInput" class="main-input" placeholder="Full Name" style="width: 100%;">
+        <input type="email" id="emailInput" class="main-input" placeholder="Email address" style="width: 100%;">
+        <input type="password" id="passwordInput" class="main-input" placeholder="Security Passcode" style="width: 100%;">
+    </div>
+
+    <div class="separator">Or</div>
+
+    <button class="btn-social-replica" onclick="window.location.href='/api/auth/google'">
+        <img src="https://www.gstatic.com/images/branding/product/1x/gsa_512dp.png" alt="Google">
+        Sign up with Google
+    </button>
+
+    <div class="auth-footer">
+        <p class="footer-link">Already part of the system? <span onclick="window.location.href='/auth'">Sign In</span></p>
+        
+        <div class="action-bar" onclick="handleSignup()">
+            <button class="btn-pill">Initialize</button>
+            <div class="action-arrows">>>></div>
+        </div>
+    </div>
+
+    <script>
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            toast.innerText = msg;
+            toast.style.display = 'block';
+            setTimeout(() => toast.style.display = 'none', 3000);
+        }
+
+        async function handleSignup() {
+            const name = document.getElementById('nameInput').value;
+            const email = document.getElementById('emailInput').value;
+            const password = document.getElementById('passwordInput').value;
+
+            if (!name || !email || !password) return showToast('Complete all protocols');
+
+            try {
+                const res = await fetch('/api/auth', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        action: 'signup', 
+                        name: name,
+                        email: email, 
+                        password: password 
+                    })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast('Identity Pulse Transmitted. Check Email.');
+                    // Redirect logic can go here (e.g., to a verification pulse screen)
+                } else {
+                    showToast(data.error || 'Enrollment Failed');
+                }
+            } catch (e) { showToast('Sync Error'); }
+        }
+    </script>
+</body>
+</html>

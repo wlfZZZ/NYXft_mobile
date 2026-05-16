@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, redirect, url_for, session, send_file
+from flask import Flask, render_template, request, jsonify, redirect, url_for, session, send_file, flash
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime, timedelta
 from functools import wraps
@@ -6,6 +6,12 @@ import os
 import pandas as pd
 import json
 import io
+import random
+import string
+import re
+from flask_mail import Mail, Message
+from authlib.integrations.flask_client import OAuth
+import requests
 
 try:
     from flask_limiter import Limiter
@@ -79,15 +85,75 @@ if HAS_TALISMAN:
         session_cookie_http_only=True
     )
 
-# SQLite configuration
-basedir = os.path.abspath(os.path.dirname(__file__))
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'nyx.db')
+# Database Configuration
+# Automatically switches between local SQLite and Production PostgreSQL
+db_url = os.getenv("DATABASE_URL", "sqlite:///nyx.db")
+if db_url.startswith("postgres://"):
+    db_url = db_url.replace("postgres://", "postgresql://", 1)
+
+app.config['SQLALCHEMY_DATABASE_URI'] = db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {"connect_args": {"timeout": 15}}
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {"connect_args": {"timeout": 15}} if "sqlite" in db_url else {}
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=31)
 app.config['SESSION_PERMANENT'] = True
 
 db = SQLAlchemy(app)
+
+# Email Configuration
+app.config['MAIL_SERVER'] = os.getenv("MAIL_SERVER", "smtp.gmail.com")
+app.config['MAIL_PORT'] = int(os.getenv("MAIL_PORT", 587))
+app.config['MAIL_USE_TLS'] = os.getenv("MAIL_USE_TLS", "True") == "True"
+app.config['MAIL_USERNAME'] = os.getenv("MAIL_USERNAME")
+app.config['MAIL_PASSWORD'] = os.getenv("MAIL_PASSWORD")
+app.config['MAIL_DEFAULT_SENDER'] = os.getenv("MAIL_DEFAULT_SENDER", "NYX Performance OS <verify@nyxft.com>")
+
+mail = Mail(app)
+
+import threading
+
+def send_async_email(app, msg):
+    with app.app_context():
+        try:
+            mail.send(msg)
+        except Exception as e:
+            print(f"[SYSTEM ALERT] Background Mail Transmission Failed: {e}")
+
+def send_pulse_code(email, code, subject="NYX OS Security Pulse"):
+    # Innovative Tactical Copy
+    html_content = f"""
+    <div style="background-color: #000; color: #fff; padding: 40px; font-family: 'Inter', sans-serif; text-align: center; border-radius: 8px;">
+        <h1 style="letter-spacing: 4px; font-weight: 800; margin-bottom: 10px; color: #fff;">NYX PERFORMANCE OS</h1>
+        <p style="color: #666; font-size: 12px; letter-spacing: 2px; margin-bottom: 40px;">// IDENTITY SYNCHRONIZATION PROTOCOL //</p>
+        
+        <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); padding: 30px; border-radius: 12px; display: inline-block; min-width: 250px;">
+            <p style="color: #888; font-size: 14px; margin-bottom: 20px; font-weight: 600;">YOUR SECURITY PULSE CODE</p>
+            <div style="font-size: 48px; font-weight: 900; letter-spacing: 12px; color: #fff; margin: 20px 0;">{code}</div>
+        </div>
+        
+        <p style="color: #444; font-size: 11px; margin-top: 40px; line-height: 1.6;">
+            This pulse is valid for the current synchronization attempt.<br>
+            If you did not initiate this uplink, secure your credentials immediately.<br>
+            <span style="color: #666;">SYSTEM STATUS: SECURE // LOCATION: CLOUD_NODE_PRIMARY</span>
+        </p>
+    </div>
+    """
+    
+    msg = Message(f"[TACTICAL UPLINK] {subject}", recipients=[email])
+    msg.html = html_content
+    msg.body = f"NYX OS Security Pulse: {code} // Identity Synchronization Active."
+    
+    threading.Thread(target=send_async_email, args=(app, msg)).start()
+    print(f"[TACTICAL PULSE] Dispatching enhanced HTML code to {email}.")
+
+# --- GOOGLE OAUTH INITIALIZATION ---
+oauth = OAuth(app)
+google = oauth.register(
+    name='google',
+    client_id=os.getenv("GOOGLE_CLIENT_ID"),
+    client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
+    server_metadata_url='https://accounts.google.com/.well-known/openid-configuration',
+    client_kwargs={'scope': 'openid email profile'}
+)
 
 # --- NAVIGATION REGISTRY (Source of Truth for Orb) ---
 NAV_REGISTRY = [
@@ -99,7 +165,7 @@ NAV_REGISTRY = [
     {"id": "prs", "label": "PR's", "url": "/pr-tracker", "icon": "ph-trophy"},
     {"id": "coaches", "label": "Coaches", "url": "/coaches", "icon": "ph-chat-circle-dots"},
     {"id": "settings", "label": "Settings", "url": "/settings", "icon": "ph-gear"},
-    {"id": "logout", "label": "Logout", "url": "/auth?mode=login", "icon": "ph-power", "class": "logout"}
+    {"id": "logout", "label": "Logout", "url": "/logout", "icon": "ph-power", "class": "logout"}
 ]
 
 @app.route('/api/nav')
@@ -144,93 +210,64 @@ except Exception as e:
     # print(f"Error loading nutrition datasets: {e}")
     pass
 
-# --- DATABASE MODELS ---
+# --- UNIFIED PERFORMANCE SCHEMA ---
+
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(120), unique=True, nullable=False)
     name = db.Column(db.String(80), nullable=False)
     nickname = db.Column(db.String(80), nullable=False)
     password = db.Column(db.String(120), nullable=False)
-    profile_setup_complete = db.Column(db.Boolean, default=False)
-    is_admin = db.Column(db.Boolean, default=False) # Legacy support
     role = db.Column(db.String(20), default='athlete') # athlete, coach, admin
+    is_verified = db.Column(db.Boolean, default=False)
+    verification_code = db.Column(db.String(6))
+    quick_pin = db.Column(db.String(4)) # 4-digit quick access key
+    profile_setup_complete = db.Column(db.Boolean, default=False)
+    last_login_at = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Coach-Athlete Uplink
     coach_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
-    coach = db.relationship('User', remote_side=[id], backref='roster')
     
-    plan = db.Column(db.String(20), default='Elite') # Trial, Starter, Pro, Elite
-    trial_start = db.Column(db.DateTime, default=datetime.utcnow)
-    
+    # Bio-Data
     age = db.Column(db.Integer, nullable=True)
     gender = db.Column(db.String(20), nullable=True)
     height = db.Column(db.String(20), nullable=True)
-    weight = db.Column(db.String(20), nullable=True)
+    weight = db.Column(db.String(20), nullable=True) # Initial/Current weight
     goal = db.Column(db.String(80), nullable=True)
     
-    last_login_at = db.Column(db.DateTime, nullable=True)
-    daily_wake_up_at = db.Column(db.String(20), nullable=True)
-    
-    # Nutrition Progression
-    nutrition_goal = db.Column(db.String(20), default='Maintain') # Bulk, Cut, Maintain
-    nutrition_week = db.Column(db.Integer, default=1)
-    nutrition_updated_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
-    # Assigned Intelligence
-    assigned_workout = db.Column(db.Text, nullable=True) # JSON string
-
-    # Professional Stats (for Coaches)
-    specialization = db.Column(db.String(100), nullable=True) # e.g. Hypertrophy, Fat Loss
+    # Coach Profile Intel
+    specialization = db.Column(db.String(100), nullable=True)
     bio = db.Column(db.Text, nullable=True)
     
-    logs = db.relationship('ProgressLog', backref='athlete', lazy=True)
-    prs = db.relationship('PersonalRecord', backref='athlete', lazy=True)
-    goals = db.relationship('PRGoal', backref='athlete', lazy=True)
-    messages = db.relationship('ChatMessage', backref='athlete', lazy=True)
+    # Relationships
+    biometrics = db.relationship('BioMetric', backref='user', lazy=True)
+    nutrition = db.relationship('NutritionLog', backref='user', lazy=True)
+    workouts = db.relationship('WorkoutSession', backref='user', lazy=True)
+    prs = db.relationship('PersonalRecord', backref='user', lazy=True)
+    messages = db.relationship('UplinkMessage', backref='user', lazy=True)
 
-    @property
-    def trial_days_left(self):
-        if self.plan != 'Trial': return 0
-        delta = datetime.utcnow() - self.trial_start
-        return max(0, 30 - delta.days)
-        
-    @property
-    def has_premium_access(self):
-        # We've removed premium access for now, so everyone has it.
-        return True
-
-class ProgressLog(db.Model):
+class BioMetric(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     date = db.Column(db.String(20), nullable=False) # YYYY-MM-DD
-    weight = db.Column(db.String(20), nullable=True)
-    cals = db.Column(db.String(20), nullable=True)
-    protein = db.Column(db.String(20), nullable=True)
-    carbs = db.Column(db.String(20), nullable=True)
-    fats = db.Column(db.String(20), nullable=True)
-    steps = db.Column(db.String(20), nullable=True)
+    weight = db.Column(db.Float, nullable=True)
+    steps = db.Column(db.Integer, default=0)
+    sleep_hours = db.Column(db.Float, nullable=True)
+    readiness_score = db.Column(db.Integer, nullable=True) # 1-10
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
 
-class PersonalRecord(db.Model):
+class NutritionLog(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     date = db.Column(db.String(20), nullable=False)
-    exercise = db.Column(db.String(80), nullable=False)
-    weight = db.Column(db.Float, nullable=False)
-    reps = db.Column(db.Integer, nullable=False)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    is_pr = db.Column(db.Boolean, default=False)  # Was this a new PR when logged?
-
-class PRGoal(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    exercise = db.Column(db.String(80), nullable=False)
-    target_weight = db.Column(db.Float, nullable=False)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-
-class ChatMessage(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    sender = db.Column(db.String(20), nullable=False) # 'client', 'coach', 'admin'
-    content = db.Column(db.Text, nullable=False)
-    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
-
+    name = db.Column(db.String(100), nullable=False)
+    meal_type = db.Column(db.String(20), nullable=False)
+    calories = db.Column(db.Integer, default=0)
+    protein = db.Column(db.Float, default=0.0)
+    carbs = db.Column(db.Float, default=0.0)
+    fats = db.Column(db.Float, default=0.0)
+    is_supplement = db.Column(db.Boolean, default=False)
 
 class WorkoutSession(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -238,109 +275,143 @@ class WorkoutSession(db.Model):
     date = db.Column(db.String(20), nullable=False)
     protocol_name = db.Column(db.String(100))
     duration_mins = db.Column(db.Integer, default=0)
-    total_volume = db.Column(db.Float, default=0.0)
-    logs = db.relationship('WorkoutLog', backref='session', lazy=True)
+    volume_kg = db.Column(db.Float, default=0.0)
+    intensity_rpe = db.Column(db.Integer, nullable=True)
+    logs = db.relationship('ExerciseLog', backref='session', lazy=True)
 
-class WorkoutLog(db.Model):
+class ExerciseLog(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     session_id = db.Column(db.Integer, db.ForeignKey('workout_session.id'), nullable=False)
     exercise_name = db.Column(db.String(100), nullable=False)
     sets_data = db.Column(db.Text, nullable=False) # JSON: [{"reps": 10, "weight": 100}, ...]
-    intensity_score = db.Column(db.Integer, default=0) # 1-10 RPE
 
-
-class DailyNutritionLog(db.Model):
+class PersonalRecord(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), nullable=False)
-    meal_type = db.Column(db.String(20), nullable=False) # Breakfast, Lunch, Dinner, Snacks
-    calories = db.Column(db.Integer, default=0)
-    protein = db.Column(db.Float, default=0.0)
-    carbs = db.Column(db.Float, default=0.0)
-    fats = db.Column(db.Float, default=0.0)
-    fiber = db.Column(db.Float, default=0.0)
-    sugar = db.Column(db.Float, default=0.0)
-    serving = db.Column(db.String(50), default='1 serving')
-    date = db.Column(db.String(20), nullable=False) # YYYY-MM-DD
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-
-class SystemAlert(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    type = db.Column(db.String(20), default='info') # info, warning, tactical
-    message = db.Column(db.String(500), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    active = db.Column(db.Boolean, default=True)
-
-class WaterLog(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    amount = db.Column(db.Float, default=0.0) # in liters
+    exercise = db.Column(db.String(80), nullable=False)
+    weight = db.Column(db.Float, nullable=False)
+    reps = db.Column(db.Integer, nullable=False)
     date = db.Column(db.String(20), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    is_historical = db.Column(db.Boolean, default=False)
+
+class UplinkMessage(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    sender = db.Column(db.String(20), nullable=False) # 'athlete', 'coach'
+    content = db.Column(db.Text, nullable=False)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
 
 class WorkoutTemplate(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     name = db.Column(db.String(100), nullable=False)
-    # JSON list of {name, sets, target}
-    exercises_data = db.Column(db.Text, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    exercises_data = db.Column(db.Text, nullable=False) # JSON list
 
-# Initialize database
-with app.app_context():
-    db.create_all()
-    
-    # Seed Admin User if none exist
-    if not User.query.filter_by(role='admin').first():
-        admin = User(
-            email="admin@nyxft.com",
-            name="Infrastructure Admin",
-            nickname="admin",
-            password="admin",
-            role="admin",
-            is_admin=True,
-            profile_setup_complete=True
-        )
-        db.session.add(admin)
+# --- TOTAL SYSTEM INITIALIZATION ---
+try:
+    with app.app_context():
+        # db.drop_all() 
+        db.create_all()
         
-        # Seed a Demo Coach
-        coach = User(
-            email="coach@nyxft.com",
-            name="Tactical Coach",
-            nickname="coach",
-            password="coach",
-            role="coach",
-            profile_setup_complete=True
-        )
-        db.session.add(coach)
-        
-        db.session.commit()
-        # print("System users seeded: Admin (admin@nyxft.com) & Coach (coach@nyxft.com)")
-
-    # Normalize existing user emails to prevent session mixups
-    all_users = User.query.all()
-    for u in all_users:
-        if u.email != u.email.lower():
-            u.email = u.email.lower()
-    try:
-        db.session.commit()
-    except:
-        db.session.rollback() # Handles cases where normalization creates a unique constraint conflict
+        # SEED TACTICAL PERSONNEL
+        if not User.query.filter_by(role='admin').first():
+            admin = User(
+                email="admin@nyxft.com",
+                name="System Admin",
+                nickname="admin",
+                password="admin",
+                role="admin",
+                is_verified=True,
+                profile_setup_complete=True
+            )
+            db.session.add(admin)
+            
+            demo_coach = User(
+                email="coach@nyxft.com",
+                name="Tactical Lead",
+                nickname="Lead",
+                password="coach",
+                role="coach",
+                is_verified=True,
+                profile_setup_complete=True,
+                specialization="Performance Engineering",
+                bio="Focusing on peak biological output and metabolic efficiency."
+            )
+            db.session.commit()
+            print("DATABASE PROTOCOL: Unified Schema Active.")
+except Exception as e:
+    print(f"DATABASE ALERT: Initialization bypassed - {e}")
 
 
 # --- ROUTING ---
 
 @app.route('/')
 def index():
-    user = None
     if 'user' in session:
-        user = User.query.filter_by(email=session['user']).first()
-    return render_template('client/index.html', user=user)
+        return redirect(url_for('dashboard'))
+    return render_template('client/index.html')
+
+@app.route('/logout')
+def logout_redirect():
+    session.clear()
+    return redirect(url_for('index'))
 
 @app.route('/auth')
 def auth():
-    mode = request.args.get('mode', 'login')
-    role = request.args.get('role', 'athlete') # athlete, coach, admin
-    return render_template('client/auth.html', mode=mode, role=role)
+    # ── SESSION PERSISTENCE CHECK ──
+    email = session.get('user')
+    if email:
+        user = User.query.filter_by(email=email).first()
+        if user:
+            if user.role == 'admin': return redirect(url_for('admin_dashboard'))
+            if user.role == 'coach': return redirect(url_for('coach_dashboard'))
+            
+            if user.profile_setup_complete:
+                return redirect(url_for('dashboard'))
+            else:
+                return redirect(url_for('profile_setup'))
+                
+    return render_template('client/auth.html')
+
+@app.route('/signup')
+def signup():
+    return redirect(url_for('auth', mode='signup'))
+
+@app.route('/api/auth/check', methods=['POST'])
+def api_auth_check():
+    email = request.json.get('email', '').lower().strip()
+    user = User.query.filter_by(email=email).first()
+    if user:
+        return jsonify({'exists': True, 'has_pin': bool(user.quick_pin)})
+    return jsonify({'exists': False})
+
+@app.route('/api/auth/pin/set', methods=['POST'])
+def api_auth_pin_set():
+    if 'user' not in session: return jsonify({'error': 'Unauthorized'}), 401
+    pin = request.json.get('pin')
+    if not pin or len(pin) != 4: return jsonify({'error': 'Invalid PIN format'}), 400
+    
+    user = User.query.filter_by(email=session['user']).first()
+    if user:
+        user.quick_pin = pin
+        db.session.commit()
+        return jsonify({'success': True, 'redirect': url_for('dashboard')})
+    return jsonify({'error': 'User not found'}), 404
+
+@app.route('/api/auth/pin/verify', methods=['POST'])
+def api_auth_pin_verify():
+    pin = request.json.get('pin')
+    email = session.get('user')
+    
+    if not email: return jsonify({'error': 'Identity session expired. Please re-authenticate via Google/Apple.'}), 401
+    
+    user = User.query.filter_by(email=email).first()
+    if user and user.quick_pin == pin:
+        user.last_login_at = datetime.utcnow()
+        db.session.commit()
+        return jsonify({'success': True, 'redirect': url_for('dashboard')})
+        
+    return jsonify({'error': 'INVALID SECURITY PIN'}), 401
 
 @app.route('/profile-setup')
 def profile_setup():
@@ -396,94 +467,28 @@ def pr_tracker():
     user = User.query.filter_by(email=session['user']).first()
     if not user: return redirect(url_for('auth'))
 
-    all_logs = user.prs[::-1]  # newest first
-
-    # ── KEY LIFTS: compute current PR, previous PR, delta for each 
+    all_logs = user.prs[::-1]
     KEY_EXERCISES = ['Bench Press', 'Squat', 'Deadlift']
     key_lifts = []
+    
     for ex in KEY_EXERCISES:
         records = sorted([p for p in user.prs if p.exercise.lower() == ex.lower()], key=lambda x: x.weight)
-        current = records[-1].weight if records else None
-        previous = records[-2].weight if len(records) >= 2 else None
-        delta = round(current - previous, 1) if current and previous else None
-        goal_obj = PRGoal.query.filter_by(user_id=user.id, exercise=ex).first()
-        goal = goal_obj.target_weight if goal_obj else None
-        pct = round((current / goal) * 100) if current and goal else 0
+        current = records[-1].weight if records else 0
+        previous = records[-2].weight if len(records) >= 2 else 0
         key_lifts.append({
             'exercise': ex,
             'current': current,
             'previous': previous,
-            'delta': delta,
-            'goal': goal,
-            'pct': min(pct, 100)
+            'delta': round(current - previous, 1) if current and previous else 0
         })
-
-    # ── PER-EXERCISE PR MAP (best weight per exercise)
-    pr_map = {}
-    for p in user.prs:
-        ex_key = p.exercise.lower()
-        if ex_key not in pr_map or p.weight > pr_map[ex_key]['weight']:
-            pr_map[ex_key] = {'exercise': p.exercise, 'weight': p.weight, 'date': p.date}
-
-    # ── WEEKLY PROGRESS BARS (last 6 weeks' best for Bench Press)
-    from collections import defaultdict
-    weekly = defaultdict(float)
-    for p in user.prs:
-        if 'bench' in p.exercise.lower():
-            week_key = p.date[:6] if len(p.date) > 5 else p.date  # crude bucketing
-            weekly[week_key] = max(weekly[week_key], p.weight)
-    weekly_bars = sorted(weekly.items())[-6:] if weekly else []
-    max_w = max([v for _, v in weekly_bars], default=1)
-    weekly_chart = [{'label': k, 'height': int((v / max_w) * 110)} for k, v in weekly_bars]
-
-    # ── INSIGHTS
-    insights = []
-    for ex in KEY_EXERCISES:
-        records = sorted([p for p in user.prs if p.exercise.lower() == ex.lower()], key=lambda x: x.weight)
-        if len(records) >= 2:
-            diff = round(records[-1].weight - records[-2].weight, 1)
-            if diff > 0:
-                insights.append(f"📈 You improved your {ex} by {diff}kg — keep the momentum!")
-            elif diff == 0:
-                insights.append(f"⚡ Your {ex} is holding steady. Push for that next level.")
-            else:
-                insights.append(f"🔄 Your {ex} had a lighter session. Recovery is progress too.")
-    if len(user.prs) >= 5:
-        insights.append("🔥 You've logged 5+ sessions — your consistency is building elite strength.")
-    if not insights:
-        insights.append("💡 Log your first workout to unlock personalized strength insights.")
-
-    # ── BIG 4 BESTS
-    best_bench = db.session.query(db.func.max(PersonalRecord.weight)).filter_by(user_id=user.id, exercise='Bench Press').scalar() or 0
-    best_squat = db.session.query(db.func.max(PersonalRecord.weight)).filter_by(user_id=user.id, exercise='Squat').scalar() or 0
-    best_deadlift = db.session.query(db.func.max(PersonalRecord.weight)).filter_by(user_id=user.id, exercise='Deadlift').scalar() or 0
-    best_ohp = db.session.query(db.func.max(PersonalRecord.weight)).filter_by(user_id=user.id, exercise='Overhead Press').scalar() or 0
-
-    # ── HERO STATS (RESTORING)
-    total_prs = len([p for p in user.prs if p.is_pr])
-    total_logs = len(user.prs)
-    best_lift = max([p.weight for p in user.prs], default=0)
-    best_lift_ex = next((p.exercise for p in sorted(user.prs, key=lambda x: x.weight, reverse=True)), '—')
-    goals_list = PRGoal.query.filter_by(user_id=user.id).all()
 
     return render_template('client/pr_tracker.html',
         user=user,
         prs=all_logs[:20],
         key_lifts=key_lifts,
-        weekly_chart=weekly_chart,
-        insights=insights,
-        total_prs=total_prs,
-        total_logs=total_logs,
-        best_lift=best_lift,
-        best_lift_ex=best_lift_ex,
-        goals=goals_list,
-        best_bench=best_bench,
-        best_squat=best_squat,
-        best_deadlift=best_deadlift,
-        best_ohp=best_ohp,
-        premium_locked=not user.has_premium_access
+        total_logs=len(user.prs),
+        best_lift=max([p.weight for p in user.prs], default=0)
     )
-
 
 @app.route('/nutrition')
 def nutrition():
@@ -493,28 +498,22 @@ def nutrition():
     if not user: return redirect(url_for('auth'))
     
     today = datetime.now().strftime("%Y-%m-%d")
-    food_items = DailyNutritionLog.query.filter_by(user_id=user.id, date=today).all()
-    water = WaterLog.query.filter_by(user_id=user.id, date=today).first()
+    food_items = NutritionLog.query.filter_by(user_id=user.id, date=today).all()
     
-    # Calculate totals
     totals = {
         'calories': sum(item.calories for item in food_items),
         'protein': sum(item.protein for item in food_items),
         'carbs': sum(item.carbs for item in food_items),
-        'fats': sum(item.fats for item in food_items),
-        'water': water.amount if water else 0.0
+        'fats': sum(item.fats for item in food_items)
     }
     
-    # Define targets (can be dynamic based on user profile)
     targets = {
         'calories': 2500,
         'protein': 180,
         'carbs': 300,
-        'fats': 70,
-        'water': 4.0
+        'fats': 70
     }
     
-    # Group by meal
     meals = {
         'Breakfast': [i for i in food_items if i.meal_type == 'Breakfast'],
         'Lunch': [i for i in food_items if i.meal_type == 'Lunch'],
@@ -543,120 +542,42 @@ def workouts():
         
     return render_template('client/workouts.html', user=user, assigned=assigned)
 
-@app.route('/api/workout/save', methods=['POST'])
-def save_workout():
-    if 'user' not in session: return jsonify({'error': 'Unauthorized'}), 401
-    user = User.query.filter_by(email=session['user']).first()
-    data = request.json
-    
-    session_record = WorkoutSession(
-        user_id=user.id,
-        date=datetime.now().strftime("%Y-%m-%d"),
-        protocol_name=data.get('protocol'),
-        duration_mins=data.get('duration'),
-        total_volume=data.get('volume', 0)
-    )
-    db.session.add(session_record)
-    db.session.commit()
-    
-    for log in data.get('logs', []):
-        new_log = WorkoutLog(
-            session_id=session_record.id,
-            exercise_name=log['exercise'],
-            sets_data=log['sets'],
-            intensity_score=log.get('rpe', 0)
-        )
-        db.session.add(new_log)
-        
-        # --- SYNC TO PERSONAL RECORDS FOR ANALYTICS ---
-        try:
-            sets = json.loads(log['sets'])
-            for s in sets:
-                pr = PersonalRecord(
-                    date=datetime.now().strftime("%b %d, %Y"),
-                    exercise=log['exercise'],
-                    weight=float(s['weight']),
-                    reps=int(s['reps']),
-                    user_id=user.id,
-                    is_pr=False
-                )
-                db.session.add(pr)
-        except Exception as e:
-            # print(f"Sync error: {e}")
-            pass
-    
-    db.session.commit()
-    return jsonify({'success': True})
-
-
-
 @app.route('/analytics')
 def analytics():
     if 'user' not in session:
         return redirect(url_for('auth'))
-    
     user = User.query.filter_by(email=session['user']).first()
     if not user: return redirect(url_for('auth'))
     
-    # ── LOG DATA EXTRACTION ──
-    logs = user.logs
-    weight_history = []
-    step_history = []
-    labels = []
+    # ── AI PREDICTIONS & CONSISTENCY ──
+    consistency_data = [1 if (b.steps or 0) >= 10000 else 0 for b in biometrics]
     
-    for l in logs[-30:]: # Max 30 days
-        labels.append(l.date)
-        try: weight_history.append(float(l.weight or 0))
-        except: weight_history.append(0)
-        try: step_history.append(int(l.steps or 0))
-        except: step_history.append(0)
+    eta_days = "STABLE"
+    try:
+        if user.weight:
+            current = float(weight_history[-1]) if weight_history and weight_history[-1] else float(user.weight)
+            # Simple heuristic: 0.5kg change per week
+            # We look for a number in the user.goal string
+            import re
+            goal_match = re.search(r'(\d+)', str(user.goal))
+            if goal_match:
+                target = float(goal_match.group(1))
+                diff = abs(current - target)
+                if diff > 0.1:
+                    weeks = diff / 0.5
+                    eta_days = f"{int(weeks * 7)} DAYS"
+    except: pass
 
-    # ── STRENGTH INTEL ──
-    prs = user.prs
-    max_lifts = {}
-    for p in prs:
-        ex = p.exercise.lower()
-        if ex not in max_lifts or p.weight > max_lifts[ex]['weight']:
-            max_lifts[ex] = {'name': p.exercise, 'weight': p.weight, 'date': p.date}
-    
-    # Volume by movement type (Simplified logic)
-    volume = {'Push': 0, 'Pull': 0, 'Legs': 0}
-    for p in prs:
-        ex = p.exercise.lower()
-        if any(x in ex for x in ['bench', 'overhead', 'press', 'dip']): volume['Push'] += p.weight * p.reps
-        elif any(x in ex for x in ['row', 'pull', 'chin', 'curl', 'deadlift']): volume['Pull'] += p.weight * p.reps
-        elif any(x in ex for x in ['squat', 'lunge', 'leg', 'extension']): volume['Legs'] += p.weight * p.reps
-
-    # ── PREDICTIVE ETA (Elite only) ──
-    eta_days = "—"
-    if len(weight_history) >= 7 and user.goal:
-        try:
-            # Simple linear prediction based on first/last of recent logs
-            start_w = weight_history[0]
-            end_w = weight_history[-1]
-            diff = end_w - start_w
-            if diff != 0:
-                target_w = float(''.join(c for c in user.goal if c.isdigit() or c=='.'))
-                remaining = target_w - end_w
-                days = (remaining / diff) * len(weight_history)
-                if days > 0:
-                    eta_date = datetime.now() + timedelta(days=int(days))
-                    eta_days = eta_date.strftime("%b %d, %Y")
-        except: pass
-
-    # ── CONSISTENCY PULSE ──
-    consistency_data = [1 if l.weight and l.cals else 0.5 for l in logs[-20:]]
-
-    return render_template('client/analytics.html', 
+    return render_template('client/analytics.html',
         user=user,
         labels=labels,
         weight_history=weight_history,
         step_history=step_history,
-        max_lifts=max_lifts,
         volume=volume,
-        eta_days=eta_days,
-        consistency_data=consistency_data
+        consistency_data=consistency_data,
+        eta_days=eta_days
     )
+
 
 @app.route('/dashboard')
 def dashboard():
@@ -677,52 +598,37 @@ def dashboard():
         db.session.commit()
     
     # --- STATS CALCULATION ---
-    user_logs = user.logs
+    # --- DASHBOARD INTELLIGENCE ---
+    user_biometrics = user.biometrics
     user_prs = user.prs
     
     # Calculate streak (days with steps >= 10000)
     streak = 0
-    for l in reversed(user_logs):
-        try:
-            if int(l.steps or 0) >= 10000:
-                streak += 1
-            else:
-                break
-        except: break
-
-    def safe_float(v, default=0.0):
-        try:
-            return float(''.join(c for c in str(v) if c.isdigit() or c=='.'))
-        except:
-            return default
-
-    def safe_int(v, default=0):
-        try:
-            return int(''.join(c for c in str(v) if c.isdigit()))
-        except:
-            return default
+    for l in reversed(user_biometrics):
+        if (l.steps or 0) >= 10000:
+            streak += 1
+        else:
+            break
 
     # Weight trend
     weight_trend = 0
-    if len(user_logs) >= 2:
-        curr_w = safe_float(user_logs[-1].weight)
-        prev_w = safe_float(user_logs[-2].weight)
-        if curr_w and prev_w:
-            weight_trend = round(curr_w - prev_w, 1)
+    if len(user_biometrics) >= 2:
+        try:
+            curr_w = user_biometrics[-1].weight or 0
+            prev_w = user_biometrics[-2].weight or 0
+            if curr_w and prev_w:
+                weight_trend = round(curr_w - prev_w, 1)
+        except: pass
 
-    # Chart Data
+    # Chart Data (7 Days)
     weekly_steps = [0] * 7
     weekly_weight = [0] * 7
     for i in range(7):
         d = (datetime.now() - timedelta(days=6-i)).strftime("%Y-%m-%d")
-        l = ProgressLog.query.filter_by(user_id=user.id, date=d).first()
-        if not l:
-            d_legacy = (datetime.now() - timedelta(days=6-i)).strftime("%b %d")
-            l = ProgressLog.query.filter_by(user_id=user.id, date=d_legacy).first()
-        
+        l = BioMetric.query.filter_by(user_id=user.id, date=d).first()
         if l:
-            weekly_steps[i] = safe_int(l.steps)
-            weekly_weight[i] = safe_float(l.weight)
+            weekly_steps[i] = l.steps or 0
+            weekly_weight[i] = l.weight or 0
 
     # Activity Timeline
     timeline = []
@@ -734,7 +640,7 @@ def dashboard():
             'time': pr.date,
             'icon': 'ph-barbell'
         })
-    for l in user_logs[-3:]:
+    for l in user_biometrics[-3:]:
         if l.weight:
             timeline.append({
                 'type': 'weight',
@@ -747,12 +653,12 @@ def dashboard():
 
     stats = {
         'main_insight': "You achieved your step goal 3 days in a row! Keep the momentum. 🔥" if streak >= 3 else "Protocol synchronized. All vital signs normal. Focusing on performance metrics.",
-        'latest_weight': safe_float(user_logs[-1].weight) if user_logs else safe_float(user.weight),
-        'latest_steps': safe_int(user_logs[-1].steps) if user_logs else 0,
+        'latest_weight': user_biometrics[-1].weight if user_biometrics and user_biometrics[-1].weight else (float(user.weight or 0)),
+        'latest_steps': user_biometrics[-1].steps if user_biometrics else 0,
         'step_goal': 10000,
         'streak': streak,
         'weight_trend': weight_trend,
-        'consistency': '0%',
+        'consistency': f"{min(100, int((len(user_biometrics) / 7) * 100))}%" if user_biometrics else "0%",
         'weekly_steps': weekly_steps,
         'weekly_weight': weekly_weight,
         'recent_pr': ('No Intel' if not user_prs else
@@ -761,22 +667,11 @@ def dashboard():
         'recent_workouts': user_prs[-3:][::-1]
     }
 
-    if user_logs:
-        stats['consistency'] = f"{min(100, int((len(user_logs) / 7) * 100))}%"
-        chart_data = []
-        for l in user_logs[-7:]:
-            s_val = float(l.steps or 0)
-            height = min(180, max(20, int((s_val / 10000) * 180)))
-            chart_data.append(height)
-        while len(chart_data) < 7:
-            chart_data.insert(0, 20)
-        stats['chart_heights'] = chart_data
-
     # Check if weight logged today
     has_logged_weight = False
     today_str = datetime.now().strftime("%Y-%m-%d")
-    today_log = ProgressLog.query.filter_by(user_id=user.id, date=today_str).first()
-    if today_log and today_log.weight and safe_float(today_log.weight) > 0:
+    today_log = BioMetric.query.filter_by(user_id=user.id, date=today_str).first()
+    if today_log and today_log.weight:
         has_logged_weight = True
 
     return render_template('client/dashboard.html', 
@@ -799,32 +694,28 @@ def api_log():
         return jsonify({'error': 'User not found'}), 404
     
     today_str = datetime.now().strftime("%Y-%m-%d")
-    existing_log = ProgressLog.query.filter_by(user_id=user.id, date=today_str).first()
-    
-    # Check legacy format if not found (for transition)
-    if not existing_log:
-        today_legacy = datetime.now().strftime("%b %d")
-        existing_log = ProgressLog.query.filter_by(user_id=user.id, date=today_legacy).first()
-        if existing_log: existing_log.date = today_str # Migrate to new format
+    existing_log = BioMetric.query.filter_by(user_id=user.id, date=today_str).first()
     
     weight = data.get('weight')
     steps = data.get('steps')
+    readiness = data.get('readiness')
     
     if existing_log:
         if weight is not None:
-            # STRICT DAILY LIMIT: Prevent any update if weight already exists
-            if existing_log.weight and safe_float(existing_log.weight) > 0:
-                return jsonify({'error': 'Protocol Limit: Daily weight already archived. Entry locked until 12AM.'}), 400
+            if existing_log.weight:
+                return jsonify({'error': 'Protocol Limit: Daily weight already archived.'}), 400
             existing_log.weight = weight
         if steps is not None:
             existing_log.steps = steps
+        if readiness is not None:
+            existing_log.readiness_score = readiness
     else:
-        new_log = ProgressLog(
+        new_log = BioMetric(
             date=today_str,
             weight=weight,
             steps=steps or 0,
-            user_id=user.id,
-            created_at=datetime.utcnow()
+            readiness_score=readiness,
+            user_id=user.id
         )
         db.session.add(new_log)
     
@@ -844,65 +735,90 @@ def api_pr():
     new_weight = float(data.get('weight', 0))
     new_reps = int(data.get('reps', 1))
 
-    # Check if this is a new PR (beats previous best)
+    # Identify if new PR
     prev_best = db.session.query(db.func.max(PersonalRecord.weight)).filter_by(
         user_id=user.id, exercise=exercise
     ).scalar()
     is_new_pr = prev_best is None or new_weight > prev_best
 
     log = PersonalRecord(
-        date=datetime.now().strftime("%b %d, %Y"),
+        date=datetime.now().strftime("%Y-%m-%d"),
         exercise=exercise,
         weight=new_weight,
         reps=new_reps,
-        user_id=user.id,
-        is_pr=is_new_pr
+        user_id=user.id
     )
     db.session.add(log)
     db.session.commit()
     return jsonify({'success': True, 'is_new_pr': is_new_pr, 'exercise': exercise, 'weight': new_weight})
 
-@app.route('/api/pr/goal', methods=['POST'])
-def api_pr_goal():
-    if 'user' not in session:
-        return jsonify({'error': 'Unauthorized'}), 401
-    data = request.json
-    user = User.query.filter_by(email=session['user']).first()
-    if not user: return jsonify({'error': 'User not found'}), 404
-    exercise = data.get('exercise', '').strip()
-    target = float(data.get('target', 0))
-    goal = PRGoal.query.filter_by(user_id=user.id, exercise=exercise).first()
-    if goal:
-        goal.target_weight = target
-    else:
-        goal = PRGoal(exercise=exercise, target_weight=target, user_id=user.id)
-        db.session.add(goal)
-    db.session.commit()
-    return jsonify({'success': True})
+@app.route('/api/auth/google', methods=['GET', 'POST'])
+@csrf.exempt
+def api_auth_google():
+    redirect_uri = url_for('api_auth_google_callback', _external=True)
+    return google.authorize_redirect(redirect_uri)
 
-@app.route('/api/pr/data')
-def api_pr_data():
-    if 'user' not in session:
-        return jsonify({'error': 'Unauthorized'}), 401
-    user = User.query.filter_by(email=session['user']).first()
-    if not user: return jsonify([])
-    logs = [{'exercise': p.exercise, 'weight': p.weight, 'reps': p.reps, 'date': p.date, 'is_pr': p.is_pr}
-            for p in user.prs[-20:]]
-    return jsonify(logs)
+@app.route('/api/auth/google/callback')
+@csrf.exempt
+def api_auth_google_callback():
+    try:
+        token = google.authorize_access_token()
+    except Exception as e:
+        return redirect(url_for('auth'))
+    
+    user_info = token.get('userinfo')
+    if not user_info:
+        user_info = google.get('userinfo').json()
+    
+    email = user_info.get('email').lower().strip()
+    name = user_info.get('name')
+    
+    user = User.query.filter_by(email=email).first()
+    
+    if not user:
+        # --- NEW PERSONNEL ENROLLMENT ---
+        user = User(
+            email=email,
+            name=name,
+            nickname=user_info.get('given_name', name),
+            password="GOOGLE_OAUTH_LINKED",
+            is_verified=True,
+            profile_setup_complete=False
+        )
+        db.session.add(user)
+        db.session.commit()
+        
+        session.permanent = True
+        session['user'] = email
+        return redirect(url_for('profile_setup'))
+    else:
+        # --- EXISTING PERSONNEL ACCESS ---
+        session.permanent = True
+        session['user'] = email
+        user.last_login_at = datetime.utcnow()
+        db.session.commit()
+        
+        if user.role == 'admin': return redirect(url_for('admin_dashboard'))
+        if user.role == 'coach': return redirect(url_for('coach_dashboard'))
+        
+        if user.profile_setup_complete:
+            return redirect(url_for('dashboard'))
+        else:
+            return redirect(url_for('profile_setup'))
 
 @app.route('/api/auth', methods=['POST'])
 @limiter.limit("5 per minute")
-@csrf.exempt # We often exempt login from CSRF if using tokens, but for sessions it should be on. 
-             # However, since we are doing a standard form/json post, I'll keep it on and update the JS.
-             # For now, let's keep it exempt to avoid breaking the current JS until we add the token logic.
+@csrf.exempt 
 def api_auth():
     data = request.json
     action = data.get('action')
-    email = data.get('email')
+    email = data.get('email', '').lower().strip()
     password = data.get('password')
 
-    if not email or not password:
-        return jsonify({'error': 'Email and passcode required'}), 400
+    if not email:
+        return jsonify({'error': 'Email required'}), 400
+    if action == 'signup' and not password:
+        return jsonify({'error': 'Passcode required for signup'}), 400
 
     if action == 'signup':
         existing_user = User.query.filter_by(email=email).first()
@@ -913,72 +829,77 @@ def api_auth():
         if not name:
             return jsonify({'error': 'Full name is required for signup'}), 400
             
+        v_code = ''.join(random.choices(string.digits, k=6))
         new_user = User(
-            email=email.lower(),
+            email=email,
             name=name,
             nickname=name,
-            password=password # Note: plaintext only for demo scope
+            password=password,
+            verification_code=v_code,
+            is_verified=False
         )
         db.session.add(new_user)
         db.session.commit()
-        session.permanent = True
-        session['user'] = email.lower()
-        return jsonify({'success': True, 'redirect': url_for('profile_setup')})
+        
+        send_pulse_code(email, v_code, "NYX OS Verification Code")
+        return jsonify({'success': True, 'requires_verification': True, 'email': email})
         
     elif action == 'login':
-        user = User.query.filter_by(email=email.lower()).first()
-        if user and user.password == password:
-            session.permanent = True
-            if user.role == 'admin':
-                session['admin_user'] = email.lower()
-                return jsonify({'success': True, 'redirect': url_for('admin_dashboard')})
-            if user.role == 'coach':
-                session['coach_user'] = email.lower()
-                return jsonify({'success': True, 'redirect': url_for('coach_dashboard')})
+        user = User.query.filter_by(email=email).first()
+        if user:
+            # Generate Login Verification Pulse
+            v_code = ''.join(random.choices(string.digits, k=6))
+            user.verification_code = v_code
+            db.session.commit()
             
-            session['user'] = email.lower()
-            return jsonify({'success': True, 'redirect': url_for('dashboard')})
-        return jsonify({'error': 'Invalid credentials'}), 401
+            send_pulse_code(email, v_code, "NYX OS Login Pulse")
+            return jsonify({'success': True, 'requires_verification': True, 'email': email, 'message': 'Security pulse transmitted.'})
+        else:
+            return jsonify({'error': 'Personnel Identity Not Found. Please create an account.'}), 404
     
     return jsonify({'error': 'Invalid action'}), 400
 
-
-@app.route('/api/workout/template', methods=['POST'])
-def save_template():
-    if 'user' not in session: return jsonify({'error': 'Unauthorized'}), 401
-    user = User.query.filter_by(email=session['user']).first()
+@app.route('/api/auth/verify', methods=['POST'])
+@csrf.exempt
+def api_verify():
     data = request.json
+    email = data.get('email', '').lower().strip()
+    code = data.get('code', '').strip()
     
-    template = WorkoutTemplate(
-        user_id=user.id,
-        name=data.get('name'),
-        exercises_data=json.dumps(data.get('exercises'))
-    )
-    db.session.add(template)
-    db.session.commit()
-    return jsonify({'success': True})
-
-@app.route('/api/workout/templates')
-def get_templates():
-    if 'user' not in session: return jsonify([]), 401
-    user = User.query.filter_by(email=session['user']).first()
-    templates = WorkoutTemplate.query.filter_by(user_id=user.id).all()
+    user = User.query.filter_by(email=email).first()
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+        
+    if user.verification_code == code:
+        # Determine if they are returning before clearing the state
+        is_returning = user.profile_setup_complete
+        
+        user.is_verified = True
+        user.verification_code = None
+        db.session.commit()
+        session.permanent = True
+        session['user'] = email
+        
+        # --- STRICT ROLE-BASED REDIRECTION ---
+        if user.role == 'admin':
+            session['admin_user'] = email
+            return jsonify({'success': True, 'redirect': url_for('admin_dashboard')})
+        if user.role == 'coach':
+            session['coach_user'] = email
+            return jsonify({'success': True, 'redirect': url_for('coach_dashboard')})
+            
+        if is_returning:
+            return jsonify({'success': True, 'redirect': url_for('dashboard')})
+        else:
+            return jsonify({'success': True, 'redirect': url_for('profile_setup')})
     
-    return jsonify([{
-        'id': t.id,
-        'name': t.name,
-        'exercises': json.loads(t.exercises_data)
-    } for t in templates])
-
+    return jsonify({'error': 'Invalid verification code'}), 400
 
 @app.route('/api/profile', methods=['POST'])
 def api_profile():
-    if 'user' not in session:
-        return jsonify({'error': 'Unauthorized'}), 401
-        
+    if 'user' not in session: return jsonify({'error': 'Unauthorized'}), 401
     data = request.json
     user = User.query.filter_by(email=session['user']).first()
-    
     if user:
         user.age = data.get('age')
         user.gender = data.get('gender')
@@ -988,47 +909,12 @@ def api_profile():
         user.profile_setup_complete = True
         db.session.commit()
         return jsonify({'success': True, 'redirect': url_for('dashboard')})
-        
     return jsonify({'error': 'User not found'}), 404
-
-@app.route('/api/settings/update', methods=['POST'])
-def api_settings_update():
-    if 'user' not in session: return jsonify({'error': 'Unauthorized'}), 401
-    user = User.query.filter_by(email=session['user']).first()
-    data = request.json
-    
-    if 'nickname' in data: user.nickname = data['nickname']
-    if 'goal' in data: user.goal = data['goal']
-    if 'weight' in data: user.weight = str(data['weight'])
-    
-    db.session.commit()
-    return jsonify({'success': True})
-
-@app.route('/api/settings/security', methods=['POST'])
-def api_settings_security():
-    if 'user' not in session: return jsonify({'error': 'Unauthorized'}), 401
-    user = User.query.filter_by(email=session['user']).first()
-    data = request.json
-    
-    old_p = data.get('old_pass')
-    new_p = data.get('new_pass')
-    conf_p = data.get('conf_pass')
-    
-    if user.password != old_p:
-        return jsonify({'error': 'CURRENT PASSCODE INVALID'}), 400
-    if new_p != conf_p:
-        return jsonify({'error': 'PASSCODE MISMATCH'}), 400
-        
-    user.password = new_p
-    db.session.commit()
-    return jsonify({'success': True})
 
 @app.route('/api/logout', methods=['POST'])
 def logout():
-    session.pop('user', None)
+    session.clear()
     return jsonify({'success': True, 'redirect': url_for('auth')})
-
-# --- CONSOLIDATED NUTRITION & HYDRATION API ---
 
 @app.route('/api/nutrition/data')
 def get_daily_data():
@@ -1037,20 +923,15 @@ def get_daily_data():
     if not user: return jsonify({'error': 'User not found'}), 404
     
     today = datetime.now().strftime("%Y-%m-%d")
-    food_items = DailyNutritionLog.query.filter_by(user_id=user.id, date=today).all()
-    water = WaterLog.query.filter_by(user_id=user.id, date=today).first()
+    food_items = NutritionLog.query.filter_by(user_id=user.id, date=today).all()
     
     totals = {
         'calories': sum(item.calories for item in food_items),
         'protein': sum(item.protein for item in food_items),
         'carbs': sum(item.carbs for item in food_items),
-        'fats': sum(item.fats for item in food_items),
-        'fiber': sum(item.fiber or 0.0 for item in food_items),
-        'sugar': sum(item.sugar or 0.0 for item in food_items),
-        'water': water.amount if water else 0.0
+        'fats': sum(item.fats for item in food_items)
     }
     
-    # Group food items by meal for the UI
     meals = {'Breakfast': [], 'Lunch': [], 'Dinner': [], 'Snacks': []}
     for item in food_items:
         if item.meal_type in meals:
@@ -1061,51 +942,28 @@ def get_daily_data():
                 'protein': item.protein,
                 'carbs': item.carbs,
                 'fats': item.fats,
-                'fiber': item.fiber,
-                'sugar': item.sugar
+                'is_supplement': item.is_supplement
             })
 
-    # Calculate TDEE and Targets
+    # Tactical Targets (Unified)
     try:
         bw = float(''.join(c for c in (user.weight or "75") if c.isdigit() or c=='.'))
     except:
         bw = 75.0
     
     tdee = int(bw * 33)
-    goal = user.nutrition_goal or 'Maintain'
-    week = user.nutrition_week or 1
-    
-    target_cals = tdee
-    adjustment = 0
-    
-    if goal == 'Cut':
-        adjustments = [300, 400, 500, 500]
-        adj_val = adjustments[min(week-1, 3)]
-        target_cals = tdee - adj_val
-        adjustment = -adj_val
-    elif goal == 'Bulk':
-        adjustments = [300, 350, 400, 400]
-        adj_val = adjustments[min(week-1, 3)]
-        target_cals = tdee + adj_val
-        adjustment = adj_val
-        
     targets = {
-        'calories': target_cals,
+        'calories': tdee,
         'protein': int(bw * 2.2),
-        'carbs': int((target_cals * 0.45) / 4), # 45% Carbs
-        'fats': int((target_cals * 0.25) / 9),  # 25% Fats
-        'fiber': 35, # 35g
-        'sugar': 50, # 50g limit
-        'water': 4.0 # 4 Liters
+        'carbs': int((tdee * 0.45) / 4),
+        'fats': int((tdee * 0.25) / 9)
     }
 
     return jsonify({
         'totals': totals,
         'meals': meals,
         'targets': targets,
-        'progression': {
-            'goal': goal, 'week': week, 'tdee': tdee, 'adjustment': adjustment
-        }
+        'user_weight': user.weight
     })
 
 @app.route('/api/nutrition/add', methods=['POST'])
@@ -1114,59 +972,31 @@ def add_food():
     user = User.query.filter_by(email=session['user']).first()
     data = request.json
     
-    new_item = DailyNutritionLog(
+    new_item = NutritionLog(
         name=data.get('name'),
         meal_type=data.get('meal_type'),
         calories=int(data.get('calories', 0)),
         protein=float(data.get('protein', 0)),
         carbs=float(data.get('carbs', 0)),
         fats=float(data.get('fats', 0)),
-        fiber=float(data.get('fiber', 0)),
-        sugar=float(data.get('sugar', 0)),
         date=datetime.now().strftime("%Y-%m-%d"),
-        user_id=user.id
+        user_id=user.id,
+        is_supplement=data.get('is_supplement', False)
     )
     db.session.add(new_item)
     db.session.commit()
     return get_daily_data()
 
-@app.route('/api/nutrition/water', methods=['POST'])
-def update_water():
-    if 'user' not in session: return jsonify({'error': 'Unauthorized'}), 401
-    user = User.query.filter_by(email=session['user']).first()
-    amount = float(request.json.get('amount', 0))
-    today = datetime.now().strftime("%Y-%m-%d")
-    
-    log = WaterLog.query.filter_by(user_id=user.id, date=today).first()
-    if log:
-        log.amount = max(0, log.amount + amount)
-    else:
-        log = WaterLog(amount=max(0, amount), date=today, user_id=user.id)
-        db.session.add(log)
-    
-    db.session.commit()
-    return get_daily_data()
 @app.route('/api/nutrition/remove', methods=['POST'])
 def remove_food():
     if 'user' not in session: return jsonify({'error': 'Unauthorized'}), 401
     item_id = request.json.get('id')
-    item = DailyNutritionLog.query.get(item_id)
+    item = NutritionLog.query.get(item_id)
     if item:
         db.session.delete(item)
         db.session.commit()
         return get_daily_data()
     return jsonify({'error': 'Item not found'}), 404
-
-@app.route('/api/nutrition/set_goal', methods=['POST'])
-def set_nutrition_goal():
-    if 'user' not in session: return jsonify({'error': 'Unauthorized'}), 401
-    user = User.query.filter_by(email=session['user']).first()
-    data = request.json
-    new_goal = data.get('goal')
-    user.nutrition_goal = new_goal
-    user.nutrition_week = 1
-    db.session.commit()
-    return jsonify({'success': True, 'message': f'Switched to {new_goal} mode. Cycle reset.'})
 from functools import wraps
 
 @app.route('/coach/login', methods=['GET'])
@@ -1217,86 +1047,37 @@ def coach_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
-
-@app.route('/admin/broadcast', methods=['POST'])
-@admin_required
-def admin_broadcast():
-    data = request.json
-    msg = data.get('message')
-    alert_type = data.get('type', 'info')
-    
-    if msg:
-        new_alert = SystemAlert(message=msg, type=alert_type)
-        db.session.add(new_alert)
-        db.session.commit()
-        return jsonify({'success': True})
-    return jsonify({'success': False}), 400
-
-@app.route('/admin/alerts/clear/<int:alert_id>', methods=['POST'])
-@admin_required
-def clear_alert(alert_id):
-    alert = SystemAlert.query.get_or_404(alert_id)
-    alert.active = False
-    db.session.commit()
-    return jsonify({'success': True})
-
-def get_flagged_athletes():
-    # Detect athletes who haven't logged in 3 days or have biometric gaps
-    three_days_ago = datetime.utcnow() - timedelta(days=3)
-    flagged = []
-    
-    # 1. Inactivity Flag
-    inactive = User.query.filter(User.role == 'athlete').filter((User.last_login_at < three_days_ago) | (User.last_login_at == None)).all()
-    for u in inactive:
-        flagged.append({'user': u, 'reason': 'INACTIVITY', 'severity': 'warning'})
-        
-    # 2. Unassigned Units (Strategic Oversight)
-    unassigned = User.query.filter(User.role == 'athlete', User.coach_id == None).all()
-    for u in unassigned:
-        if u not in [f['user'] for f in flagged]:
-            flagged.append({'user': u, 'reason': 'NO_COACH_ASSIGNED', 'severity': 'tactical'})
-            
-    return flagged
-
-# --- CHAT API ENDPOINTS ---
-
 @app.route('/api/chat/send', methods=['POST'])
 def api_send_message():
     data = request.json
     user_id = data.get('user_id')
     content = data.get('content')
-    sender = data.get('sender') # 'admin' or 'athlete'
+    sender = data.get('sender')
     
     if not all([user_id, content, sender]):
         return jsonify({'error': 'Missing data'}), 400
         
-    msg = ChatMessage(user_id=user_id, content=content, sender=sender)
+    msg = UplinkMessage(user_id=user_id, content=content, sender=sender)
     db.session.add(msg)
     db.session.commit()
     return jsonify({'success': True})
 
 @app.route('/api/chat/history/<int:user_id>')
 def api_chat_history(user_id):
-    # Get current user from any of the three possible sessions
     viewer_email = session.get('user') or session.get('coach_user') or session.get('admin_user')
     if not viewer_email:
         return jsonify({'error': 'Unauthorized'}), 401
         
     viewer = User.query.filter_by(email=viewer_email).first()
-    if not viewer:
-        return jsonify({'error': 'Unauthorized'}), 401
     target = User.query.get_or_404(user_id)
 
-    # ACCESS CONTROL: 
-    # 1. Athlete can see their own chat.
-    # 2. Coach can only see chat with THEIR athletes.
-    # 3. Admin can see all (for oversight/safety).
+    # Security Handshake
     if viewer.role == 'athlete' and viewer.id != target.id:
         return jsonify({'error': 'Unauthorized'}), 403
     if viewer.role == 'coach' and target.coach_id != viewer.id:
         return jsonify({'error': 'Unauthorized'}), 403
 
-    messages = ChatMessage.query.filter_by(user_id=user_id).order_by(ChatMessage.timestamp.asc()).all()
+    messages = UplinkMessage.query.filter_by(user_id=user_id).order_by(UplinkMessage.timestamp.asc()).all()
     return jsonify([{
         'sender': m.sender,
         'content': m.content,
@@ -1307,259 +1088,69 @@ def api_chat_history(user_id):
 @admin_required
 def admin_dashboard():
     total_users = User.query.count()
-    total_logs = DailyNutritionLog.query.count()
+    total_logs = BioMetric.query.count() + NutritionLog.query.count()
     recent_users = User.query.order_by(User.id.desc()).limit(5).all()
-    
-    # New Intelligence Data
-    flagged = get_flagged_athletes()
-    active_alerts = SystemAlert.query.filter_by(active=True).order_by(SystemAlert.id.desc()).all()
-    
-    # Stats
-    premium_users = User.query.filter(User.plan != 'Trial').count()
     total_coaches = User.query.filter_by(role='coach').count()
     
     return render_template('admin/admin_dashboard.html', 
                            total_users=total_users, 
                            total_logs=total_logs,
                            recent_users=recent_users,
-                           premium_users=premium_users,
-                           total_coaches=total_coaches,
-                           nutrition_count=len(NUTRITION_DB),
-                           flagged_athletes=flagged[:5],
-                           active_alerts=active_alerts)
-
-
-@app.route('/admin/chat')
-@admin_required
-def admin_chat():
-    target_id = request.args.get('user_id')
-    # Admins focus on communications with unassigned athletes or direct system support
-    athletes = User.query.filter_by(role='athlete').all()
-    return render_template('admin/admin_chat.html', athletes=athletes, target_id=target_id)
+                           total_coaches=total_coaches)
 
 @app.route('/coach/dashboard')
 @coach_required
 def coach_dashboard():
-    # Use coach_user session key
     coach = User.query.filter_by(email=session['coach_user']).first()
     
-    # PERMANENT FIX: Global Oversight for Admins, Specific Roster for Coaches
-    if coach.role == 'admin' or coach.is_admin:
+    if coach.role == 'admin':
         roster = User.query.filter_by(role='athlete').all()
-        oversight_mode = "GLOBAL_ADMIN"
     else:
         roster = User.query.filter_by(coach_id=coach.id).all()
-        oversight_mode = "TACTICAL_COACH"
         
-    # print(f"[TACTICAL_DIAGNOSTIC] Mode: {oversight_mode} | ID: {coach.id} | Roster Count: {len(roster)}")
-    
-    # Generate Performance Snapshots
     roster_stats = []
     activity_feed = []
     
     for athlete in roster:
-        logs = ProgressLog.query.filter_by(user_id=athlete.id).order_by(ProgressLog.date.desc()).limit(7).all()
+        # Pull latest biometrics for trend analysis
+        logs = BioMetric.query.filter_by(user_id=athlete.id).order_by(BioMetric.date.desc()).limit(7).all()
         
-        # Calculate Weight Delta (Trend)
         weight_delta = 0
         if len(logs) >= 2:
             try:
-                curr_w = float(logs[0].weight) if logs[0].weight else 0
-                prev_w = float(logs[1].weight) if logs[1].weight else 0
+                curr_w = logs[0].weight or 0
+                prev_w = logs[1].weight or 0
                 if curr_w and prev_w:
                     weight_delta = round(curr_w - prev_w, 1)
             except: pass
             
-        # Dynamic Status Engine
         status = "offline"
-        last_seen = "Never"
-        if athlete.last_login_at:
-            diff = datetime.utcnow() - athlete.last_login_at
-            if diff < timedelta(minutes=60):
-                status = "online"
-            elif diff < timedelta(days=1):
-                status = "active"
-            elif diff < timedelta(days=3):
-                status = "away"
-            else:
-                status = "inactive"
-            last_seen = athlete.last_login_at.strftime("%b %d, %H:%M")
+        if athlete.biometrics:
+            latest = athlete.biometrics[-1]
+            diff = datetime.utcnow() - latest.created_at
+            status = "active" if diff < timedelta(days=1) else "inactive"
 
-        # Safe weight history extraction
-        if logs:
-            weight_history = [float(log.weight or 0) for log in reversed(logs)]
-        else:
-            # Fallback to athlete weight, ensuring it's a valid float
-            try:
-                weight_val = float(athlete.weight) if athlete.weight else 70.0
-            except (ValueError, TypeError):
-                weight_val = 70.0
-            weight_history = [weight_val]
-        dates = [log.date[5:] for log in reversed(logs)] if logs else ['N/A']
-        
         roster_stats.append({
             'user': athlete,
-            'weight_history': weight_history,
-            'dates': dates,
-            'latest_log': logs[0] if logs else None,
+            'weight_history': [float(log.weight or 0) for log in reversed(logs)] if logs else [70.0],
+            'dates': [log.date[5:] for log in reversed(logs)] if logs else ['N/A'],
             'weight_delta': weight_delta,
-            'status': status,
-            'last_seen': last_seen
+            'status': status
         })
         
-        # Add to global activity feed
         if logs:
             activity_feed.append({
                 'name': athlete.name,
-                'action': 'LOGGED_BIOMETRICS',
+                'action': 'LOGGED_VITALS',
                 'time': logs[0].created_at.strftime('%H:%M'),
-                'detail': f"{logs[0].weight}kg / {logs[0].cals}kcal"
+                'detail': f"{logs[0].weight}kg | {logs[0].readiness_score or 'N/A'} Readiness"
             })
-
-    # Sort activity feed by time (pseudo-realtime)
-    activity_feed = sorted(activity_feed, key=lambda x: x['time'], reverse=True)[:10]
 
     return render_template('coach/dashboard.html', 
                            roster=roster, 
                            roster_stats=roster_stats,
-                           activity_feed=activity_feed,
+                           activity_feed=activity_feed[:10],
                            roster_count=len(roster))
-
-@app.route('/coach/roster')
-@coach_required
-def coach_roster():
-    coach = User.query.filter_by(email=session['coach_user']).first()
-    
-    if coach.role == 'admin' or coach.is_admin:
-        roster = User.query.filter_by(role='athlete').all()
-    else:
-        roster = User.query.filter_by(coach_id=coach.id).all()
-        
-    roster_stats = []
-    for athlete in roster:
-        logs = ProgressLog.query.filter_by(user_id=athlete.id).order_by(ProgressLog.date.desc()).limit(7).all()
-        
-        weight_delta = 0
-        if len(logs) >= 2:
-            try:
-                curr_w = float(logs[0].weight) if logs[0].weight else 0
-                prev_w = float(logs[1].weight) if logs[1].weight else 0
-                if curr_w and prev_w:
-                    weight_delta = round(curr_w - prev_w, 1)
-            except: pass
-            
-        status = "offline"
-        last_seen = "Never"
-        if athlete.last_login_at:
-            diff = datetime.utcnow() - athlete.last_login_at
-            if diff < timedelta(minutes=60): status = "online"
-            elif diff < timedelta(days=1): status = "active"
-            elif diff < timedelta(days=3): status = "away"
-            else: status = "inactive"
-            last_seen = athlete.last_login_at.strftime("%b %d, %H:%M")
-
-        roster_stats.append({
-            'user': athlete,
-            'latest_log': logs[0] if logs else None,
-            'weight_delta': weight_delta,
-            'status': status,
-            'last_seen': last_seen
-        })
-        
-    return render_template('coach/roster.html', 
-                           roster_stats=roster_stats,
-                           roster_count=len(roster))
-
-@app.route('/coach/programming')
-@coach_required
-def coach_programming():
-    coach = User.query.filter_by(email=session['coach_user']).first()
-    blueprints = WorkoutTemplate.query.filter_by(user_id=coach.id).all()
-    
-    if coach.role == 'admin' or coach.is_admin:
-        roster = User.query.filter_by(role='athlete').all()
-    else:
-        roster = User.query.filter_by(coach_id=coach.id).all()
-        
-    return render_template('coach/programming.html', 
-                           blueprints=blueprints,
-                           roster=roster)
-
-@app.route('/api/programming/save', methods=['POST'])
-@coach_required
-def save_blueprint():
-    coach = User.query.filter_by(email=session['coach_user']).first()
-    data = request.json
-    
-    new_template = WorkoutTemplate(
-        user_id=coach.id,
-        name=data.get('name'),
-        exercises_data=json.dumps(data.get('exercises'))
-    )
-    db.session.add(new_template)
-    db.session.commit()
-    return jsonify({'success': True})
-
-@app.route('/api/programming/assign', methods=['POST'])
-@coach_required
-def assign_protocol():
-    data = request.json
-    athlete_id = data.get('athlete_id')
-    protocol_id = data.get('protocol_id')
-    
-    athlete = User.query.get_or_404(athlete_id)
-    protocol = WorkoutTemplate.query.get_or_404(protocol_id)
-    
-    athlete.assigned_workout = protocol.exercises_data
-    db.session.commit()
-    return jsonify({'success': True})
-
-@app.route('/coach/intelligence')
-@coach_required
-def coach_intelligence_hub():
-    coach = User.query.filter_by(email=session['coach_user']).first()
-    
-    if coach.role == 'admin' or coach.is_admin:
-        roster = User.query.filter_by(role='athlete').all()
-    else:
-        roster = User.query.filter_by(coach_id=coach.id).all()
-        
-    return render_template('coach/intelligence_hub.html', 
-                           roster=roster,
-                           roster_count=len(roster))
-
-@app.route('/coach/intelligence/<int:user_id>')
-@coach_required
-def coach_intelligence(user_id):
-    coach = User.query.filter_by(email=session['coach_user']).first()
-    athlete = User.query.get_or_404(user_id)
-    
-    # Security: Ensure this coach owns this athlete (Admins have Global Oversight)
-    is_authorized_admin = coach.role == 'admin' or coach.is_admin
-    if not is_authorized_admin and athlete.coach_id != coach.id:
-        return redirect(url_for('coach_dashboard'))
-    
-    logs = ProgressLog.query.filter_by(user_id=athlete.id).order_by(ProgressLog.date.desc()).all()
-    if logs:
-        weight_history = [float(log.weight or 0) for log in reversed(logs)]
-    else:
-        try:
-            weight_val = float(athlete.weight) if athlete.weight else 70.0
-        except (ValueError, TypeError):
-            weight_val = 70.0
-        weight_history = [weight_val]
-    dates = [log.date[5:] for log in reversed(logs)] if logs else ['N/A']
-    
-    # PR History
-    prs = PersonalRecord.query.filter_by(user_id=athlete.id).order_by(PersonalRecord.date.desc()).all()
-
-    return render_template('coach/intelligence.html',
-                           athlete=athlete,
-                           weight_history=weight_history,
-                           dates=dates,
-                           prs=prs,
-                           logs=logs[:10],
-                           roster_count=User.query.filter_by(coach_id=coach.id).count())
 
 @app.route('/admin/users')
 @admin_required
@@ -1572,11 +1163,8 @@ def admin_users():
 @admin_required
 def assign_coach():
     data = request.json
-    user_id = data.get('user_id')
-    coach_id = data.get('coach_id')
-    
-    athlete = User.query.get_or_404(user_id)
-    athlete.coach_id = coach_id
+    athlete = User.query.get_or_404(data.get('user_id'))
+    athlete.coach_id = data.get('coach_id')
     db.session.commit()
     return jsonify({'success': True})
 
@@ -1586,57 +1174,39 @@ def export_users():
     athletes = User.query.filter_by(role='athlete').all()
     data = []
     for u in athletes:
-        coach_name = u.coach.name if u.coach else 'UNASSIGNED'
         data.append({
-            'Node ID': f"ID_NODE_{u.id:04d}",
+            'ID': f"NYX-{u.id:04d}",
             'Name': u.name,
             'Email': u.email,
-            'Plan': u.plan,
             'Age': u.age,
-            'Gender': u.gender,
             'Goal': u.goal,
-            'Coach': coach_name,
-            'Last Login': u.last_login_at.strftime('%Y-%m-%d %H:%M') if u.last_login_at else 'NEVER'
+            'Verified': 'YES' if u.is_verified else 'NO'
         })
     
     df = pd.DataFrame(data)
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        df.to_excel(writer, index=False, sheet_name='Athlete Manifest')
+        df.to_excel(writer, index=False, sheet_name='Personnel')
     output.seek(0)
     
     return send_file(
         output,
         mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         as_attachment=True,
-        download_name=f"NYX_Athlete_Manifest_{datetime.now().strftime('%Y%m%d')}.xlsx"
+        download_name=f"NYX_Personnel_Manifest.xlsx"
     )
-
-@app.route('/admin/users/toggle_admin/<int:user_id>', methods=['POST'])
-@admin_required
-def toggle_admin(user_id):
-    user = User.query.get_or_404(user_id)
-    # Prevent self-demotion if necessary, but keep it simple for now
-    user.is_admin = not user.is_admin
-    db.session.commit()
-    flash(f"Updated privileges for {user.name}", "success")
-    return redirect(url_for('admin_users'))
 
 @app.route('/admin/users/delete/<int:user_id>', methods=['POST'])
 @admin_required
 def delete_user(user_id):
     user = User.query.get_or_404(user_id)
-    # Delete all associated data
-    DailyNutritionLog.query.filter_by(user_id=user.id).delete()
-    ProgressLog.query.filter_by(user_id=user.id).delete()
-    PersonalRecord.query.filter_by(user_id=user.id).delete()
-    PRGoal.query.filter_by(user_id=user.id).delete()
-    WaterLog.query.filter_by(user_id=user.id).delete()
-    ChatMessage.query.filter_by(user_id=user.id).delete()
-    
+    BioMetric.query.filter_by(user_id=user.id).delete()
+    NutritionLog.query.filter_by(user_id=user.id).delete()
+    WorkoutSession.query.filter_by(user_id=user.id).delete()
+    UplinkMessage.query.filter_by(user_id=user.id).delete()
     db.session.delete(user)
     db.session.commit()
-    flash(f"Athlete {user.name} and all associated intelligence purged.", "success")
+    flash(f"Personnel {user.name} purged from system.", "success")
     return redirect(url_for('admin_users'))
 
 
@@ -1658,13 +1228,13 @@ def assign_workout():
 @admin_required
 def admin_athlete_profile(user_id):
     target_user = User.query.get_or_404(user_id)
-    # Get stats for charts
-    logs = ProgressLog.query.filter_by(user_id=user_id).order_by(ProgressLog.date.asc()).all()
+    # Get vitals for charts from the new BioMetric model
+    logs = BioMetric.query.filter_by(user_id=user_id).order_by(BioMetric.date.asc()).all()
     prs = PersonalRecord.query.filter_by(user_id=user_id).order_by(PersonalRecord.date.desc()).all()
     
     # Weights for chart
-    weights = [float(l.weight or 0) for l in logs if l.weight]
-    dates = [l.date for l in logs if l.weight]
+    weights = [log.weight for log in logs if log.weight]
+    dates = [log.date for log in logs if log.weight]
     
     return render_template('admin/admin_athlete_profile.html', 
                            target_user=target_user,
@@ -1678,11 +1248,8 @@ def admin_athlete_profile(user_id):
 @admin_required
 def assign_nutrition():
     data = request.json
-    user_id = data.get('user_id')
-    goal = data.get('goal')
-    
-    user = User.query.get_or_404(user_id)
-    user.goal = goal
+    user = User.query.get_or_404(data.get('user_id'))
+    user.goal = data.get('goal')
     db.session.commit()
     return jsonify({'success': True})
 
@@ -1690,13 +1257,10 @@ def assign_nutrition():
 @admin_required
 def admin_modify_nutrition():
     data = request.json
-    user_id = data.get('user_id')
+    user = User.query.get_or_404(data.get('user_id'))
     new_goal = data.get('goal')
     
-    user = User.query.get_or_404(user_id)
-    user.nutrition_goal = new_goal
-    user.nutrition_week = 1
-    user.nutrition_updated_at = datetime.utcnow()
+    user.goal = new_goal
     db.session.commit()
     
     return jsonify({'success': True, 'message': f'Nutrition goal for {user.name} updated to {new_goal}'})
@@ -1741,41 +1305,7 @@ def admin_workouts():
 def get_foods():
     return jsonify(NUTRITION_DB)
 
-def migrate_database():
-    with app.app_context():
-        import sqlite3
-        db_uri = app.config['SQLALCHEMY_DATABASE_URI']
-        if db_uri.startswith('sqlite:///'):
-            db_path = db_uri.replace('sqlite:///', '')
-            if not os.path.isabs(db_path):
-                db_path = os.path.join(basedir, db_path)
-            
-            try:
-                conn = sqlite3.connect(db_path)
-                cursor = conn.cursor()
-                
-                # Check for fiber column
-                cursor.execute("PRAGMA table_info(daily_nutrition_log)")
-                columns = [column[1] for column in cursor.fetchall()]
-                
-                if 'fiber' not in columns:
-                    cursor.execute('ALTER TABLE daily_nutrition_log ADD COLUMN fiber FLOAT DEFAULT 0.0')
-                    print("Auto-migrated: Added 'fiber' column.")
-                
-                if 'sugar' not in columns:
-                    cursor.execute('ALTER TABLE daily_nutrition_log ADD COLUMN sugar FLOAT DEFAULT 0.0')
-                    print("Auto-migrated: Added 'sugar' column.")
-                
-                conn.commit()
-                conn.close()
-            except Exception as e:
-                print(f"Auto-migration failed: {e}")
-
 if __name__ == '__main__':
-    # Run auto-migration
-    migrate_database()
-    # Create tables if they don't exist
-    with app.app_context():
-        db.create_all()
-    # Run on 5002 to avoid conflicts with other apps
-    app.run(debug=True, port=5002)
+    # The Unified Schema is initialized in the 'TOTAL SYSTEM INITIALIZATION' block above
+    port = int(os.environ.get('PORT', 5002))
+    app.run(host='0.0.0.0', port=port)

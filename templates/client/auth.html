@@ -2,536 +2,370 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Protocol Access | NYXFT</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>NYX Performance | Auth</title>
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800;900&display=swap" rel="stylesheet">
-    <link rel="manifest" href="/static/manifest.json">
-    <meta name="theme-color" content="#000000">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <link rel="apple-touch-icon" href="/static/img/icon-192.png">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/client/css/auth_replica.css">
     <style>
-        :root {
-            --accent-blue: #007AFF;
-            --accent-red: #FF453A;
-            --text-main: #000000;
-            --text-dim: #8E8E93;
-            --bg-primary: #FFFFFF;
-            --bg-subtle: #F2F2F7;
-            --border-light: rgba(0,0,0,0.05);
-            --card-radius: 28px;
-        }
-
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
-            -webkit-font-smoothing: antialiased;
-        }
-
-        body {
-            background-color: var(--bg-primary);
-            color: var(--text-main);
-            height: 100vh;
-            width: 100vw;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-            position: relative;
-        }
-
-        /* ════ BACKGROUND ARCHITECTURE ════ */
-        .bg-grid {
-            position: absolute;
-            inset: 0;
-            background-image: 
-                linear-gradient(rgba(0,0,0,0.02) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(0,0,0,0.02) 1px, transparent 1px);
-            background-size: 80px 80px;
-            z-index: -1;
-            pointer-events: none;
-        }
-
-        /* ════ TOP NAV ════ */
-        .auth-nav {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 24px 20px;
-            z-index: 10;
-        }
-
-        .back-btn {
-            color: #000;
-            font-size: 1.5rem;
-            text-decoration: none;
-            display: flex;
-            align-items: center;
-            width: 40px;
-            height: 40px;
-            background: var(--bg-subtle);
-            border-radius: 12px;
-            justify-content: center;
-        }
-
-        .brand-logo {
-            font-size: 1.2rem;
-            font-weight: 900;
-            letter-spacing: -1px;
-            text-decoration: none;
-            color: var(--text-main);
-        }
-
-        .brand-logo .ft {
-            color: var(--accent-red);
-        }
-
-        /* ════ MAIN CONTENT ════ */
-        .auth-main {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding: 20px;
+        .auth-card {
             width: 100%;
-            max-width: 420px;
-            margin: 0 auto;
-            position: relative;
-            z-index: 5;
-            overflow-y: auto;
-            scrollbar-width: none;
-        }
-        .auth-main::-webkit-scrollbar { display: none; }
-
-        /* ════ PIN PAD OVERLAY ════ */
-        .pin-overlay {
-            position: fixed; inset: 0; background: #fff; z-index: 2000;
-            display: none; flex-direction: column; align-items: center; justify-content: center;
+            max-width: 380px;
+            padding: 40px 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
             animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1);
-            transition: opacity 0.5s ease-out;
-        }
-        .pin-overlay.active { display: flex; }
-        .pin-overlay.authorized { background: var(--bg-primary); }
-
-        .pin-dots { display: flex; gap: 20px; margin: 40px 0; }
-        .pin-dot { width: 14px; height: 14px; border: 2px solid var(--bg-subtle); border-radius: 50%; transition: 0.2s; }
-        .pin-dot.filled { background: #000; border-color: #000; transform: scale(1.2); }
-
-        .numpad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; width: 100%; max-width: 280px; }
-        .num-btn {
-            width: 70px; height: 70px; border-radius: 50%; background: var(--bg-subtle);
-            display: flex; align-items: center; justify-content: center;
-            font-size: 1.8rem; font-weight: 600; cursor: pointer; transition: 0.2s;
-        }
-        .num-btn:active { background: #000; color: #fff; transform: scale(0.9); }
-        .num-btn.action { background: transparent; font-size: 1.2rem; }
-
-        /* ════ UPLINK ANIMATION ════ */
-        .uplink-hud { display: none; flex-direction: column; align-items: center; gap: 20px; }
-        .pin-overlay.authorized .numpad, .pin-overlay.authorized .pin-dots, .pin-overlay.authorized .switch-mode { display: none; }
-        .pin-overlay.authorized .uplink-hud { display: flex; }
-
-        .loading-ring {
-            width: 80px; height: 80px; border: 3px solid var(--bg-subtle);
-            border-top-color: var(--accent-blue); border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-        }
-        .loading-ring.complete { animation: none; border-color: #000; display: flex; align-items: center; justify-content: center; font-size: 2rem; }
-
-        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
-        @keyframes shake { 
-            0%, 100% { transform: translateX(0); }
-            20%, 60% { transform: translateX(-10px); }
-            40%, 80% { transform: translateX(10px); }
-        }
-        .shake { animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both; }
-
-        .auth-icon-badge {
-            width: 72px;
-            height: 72px;
-            background: #000;
-            border-radius: 20px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 2rem;
-            color: #fff;
-            margin-bottom: 24px;
-            box-shadow: 0 15px 30px rgba(0,0,0,0.1);
         }
 
-        .auth-header {
-            text-align: center;
-            margin-bottom: 32px;
-        }
-
-        .auth-eyebrow {
-            font-size: 0.65rem;
-            font-weight: 900;
-            letter-spacing: 2px;
-            color: var(--accent-blue);
-            text-transform: uppercase;
-            margin-bottom: 8px;
-        }
-
-        .auth-title {
-            font-size: 2.2rem;
-            font-weight: 900;
-            line-height: 1;
-            letter-spacing: -1.5px;
-            margin-bottom: 12px;
-        }
-
-        .auth-desc {
-            font-size: 0.95rem;
-            color: var(--text-dim);
-            font-weight: 600;
-            line-height: 1.4;
-        }
-
-        /* ════ FORM ════ */
-        .auth-form {
-            width: 100%;
-            display: flex;
-            flex-direction: column;
-            gap: 16px;
-        }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(40px); } to { opacity: 1; transform: translateY(0); } }
 
         .input-group {
             display: flex;
             flex-direction: column;
-            gap: 8px;
+            gap: 10px;
         }
 
         .input-group label {
             font-size: 0.65rem;
-            font-weight: 900;
+            font-weight: 800;
             color: var(--text-dim);
             text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-left: 4px;
+            letter-spacing: 1.5px;
+            padding-left: 10px;
         }
 
-        .input-wrapper {
-            position: relative;
-            display: flex;
-            align-items: center;
-            background: var(--bg-subtle);
-            border-radius: 18px;
-            padding: 0 16px;
-            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-            border: 2px solid transparent;
-        }
-
-        .input-wrapper:focus-within {
-            background: #fff;
-            border-color: #000;
-            box-shadow: 0 10px 20px rgba(0,0,0,0.02);
-        }
-
-        .input-wrapper i {
-            color: #000;
-            font-size: 1.2rem;
-        }
-
-        .input-wrapper input {
-            width: 100%;
-            padding: 16px 0 16px 12px;
-            border: none;
-            background: transparent;
-            font-size: 1rem;
-            font-weight: 700;
-            outline: none;
-            color: #000;
-        }
-
-        .input-wrapper input::placeholder {
-            color: #C7C7CC;
-        }
-
-        .btn-submit {
-            width: 100%;
-            background: #000;
-            color: #fff;
-            border: none;
+        .glass-input {
+            background: rgba(255, 255, 255, 0.6);
+            border: 1px solid rgba(0,0,0,0.05);
             padding: 20px;
             border-radius: 20px;
-            font-weight: 900;
-            font-size: 0.9rem;
-            letter-spacing: 1px;
-            text-transform: uppercase;
+            font-size: 1rem;
+            font-weight: 600;
+            outline: none;
+            transition: all 0.3s;
+        }
+
+        .glass-input:focus {
+            background: #FFFFFF;
+            border-color: #000;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+        }
+
+        .social-auth {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .btn-social {
+            flex: 1;
+            padding: 18px;
+            background: #FFFFFF;
+            border: 1px solid rgba(0,0,0,0.05);
+            border-radius: 18px;
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 12px;
-            margin-top: 12px;
+            gap: 10px;
+            font-weight: 700;
+            font-size: 0.85rem;
             cursor: pointer;
             transition: 0.2s;
         }
 
-        .btn-submit:active { transform: scale(0.96); }
+        .btn-social:active { transform: scale(0.96); }
 
-        .divider {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            font-size: 0.65rem;
-            font-weight: 900;
+        .auth-footer {
+            text-align: center;
+            margin-top: 40px;
+            font-size: 0.8rem;
+            font-weight: 600;
             color: var(--text-dim);
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            margin: 24px 0;
         }
-        .divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: var(--border-light); }
 
-        .btn-google {
-            width: 100%;
-            background: #fff;
-            border: 1px solid var(--border-light);
-            padding: 18px;
-            border-radius: 20px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 12px;
-            font-size: 0.85rem;
-            font-weight: 800;
+        .auth-footer span {
             color: #000;
             cursor: pointer;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.02);
+            text-decoration: underline;
         }
-        
-        .btn-google img { width: 18px; height: 18px; }
-
-        .switch-mode {
-            margin-top: 32px;
-            text-align: center;
-            font-size: 0.9rem;
-            font-weight: 700;
-            color: var(--text-dim);
-        }
-
-        .switch-mode a {
-            color: var(--accent-blue);
-            text-decoration: none;
-            margin-left: 4px;
-        }
-
-        /* ════ FOOTER ════ */
-        .secure-footer {
-            padding: 24px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 12px;
-            background: var(--bg-primary);
-            border-top: 1px solid var(--border-light);
-        }
-
-        .secure-text { font-size: 0.7rem; font-weight: 800; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; }
-
-        /* Animation */
-        .fade-in { animation: fadeIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-
-        /* Prevent Flash: Hide main auth by default */
-        .auth-main { opacity: 0; visibility: hidden; transition: opacity 0.4s ease; }
-        .auth-main.visible { opacity: 1; visibility: visible; }
     </style>
 </head>
 <body>
-    <div class="bg-grid"></div>
+    <div id="toast" style="position: fixed; top: 50px; left: 20px; right: 20px; background: rgba(0,0,0,0.9); color: white; padding: 16px; border-radius: 16px; display: none; z-index: 1000; text-align: center; font-size: 0.8rem; font-weight: 700; box-shadow: 0 20px 40px rgba(0,0,0,0.2);"></div>
 
-    <div class="auth-nav fade-in">
-        <a href="/" class="back-btn"><i class="ph-bold ph-caret-left"></i></a>
-        <a href="/" class="brand-logo">NYX<span class="ft">FT</span></a>
-        <div style="width: 40px;"></div>
+    <div class="vault-access-container" style="margin-top:0;">
+    <!-- Tactical Splash Screen -->
+    <div id="splashScreen" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+        <div class="splash-logo" style="font-size: 3rem; font-weight: 900; letter-spacing: -2px; color: #fff; position: relative;">
+            NYX<span style="color: var(--accent-red);">.</span>
+            <div style="position: absolute; bottom: -20px; left: 0; width: 0%; height: 2px; background: #fff; animation: logo-load 1.5s ease-out forwards;"></div>
+        </div>
+        <div class="boot-sequence" style="margin-top: 40px; font-family: monospace; font-size: 0.6rem; color: #333; text-align: left; width: 180px;">
+            <div class="boot-line" style="animation: fade-in-line 0.1s 0.2s forwards; opacity: 0;">> INITIALIZING_CORE...</div>
+            <div class="boot-line" style="animation: fade-in-line 0.1s 0.5s forwards; opacity: 0;">> SYNCING_UPLINK...</div>
+            <div class="boot-line" style="animation: fade-in-line 0.1s 0.8s forwards; opacity: 0;">> SECURING_NODE_PRIMARY...</div>
+            <div class="boot-line" style="animation: fade-in-line 0.1s 1.2s forwards; opacity: 0;">> PERMISSION_GRANTED_V.2026</div>
+        </div>
     </div>
 
-    <div class="auth-main fade-in">
+    <style>
+        @keyframes logo-load { 0% { width: 0; } 100% { width: 100%; } }
+        @keyframes fade-in-line { 0% { opacity: 0; transform: translateY(5px); } 100% { opacity: 1; transform: translateY(0); } }
+        .splash-out { animation: splash-fade 0.5s ease-out forwards; pointer-events: none; }
+        @keyframes splash-fade { 0% { opacity: 1; filter: blur(0); } 100% { opacity: 0; filter: blur(20px); transform: scale(1.1); } }
+        .auth-in { animation: auth-reveal 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        @keyframes auth-reveal { 0% { opacity: 0; transform: translateY(30px) scale(0.95); filter: blur(10px); } 100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); } }
+    </style>
 
-        <div class="auth-icon-badge">
-            <i class="ph-fill ph-shield-check"></i>
-        </div>
+        <div class="auth-card" style="opacity: 0;">
+            <header style="text-align:center; margin-bottom: 20px;">
+                <h1 class="vault-title" id="authTitle">Personnel Link</h1>
+                <p class="vault-sub" id="authSub">ENTER EMAIL // SYNC UPLINK</p>
+            </header>
 
-        <div class="auth-header">
-            <div class="auth-eyebrow">{% if mode == 'login' %}WELCOME BACK{% else %}NEW PROTOCOL{% endif %}</div>
-            <h1 class="auth-title">{% if mode == 'login' %}Access Portal{% else %}Create Identity{% endif %}</h1>
-            <p class="auth-desc">{% if mode == 'login' %}Initialize your tactical training session.{% else %}Deploy your biometric profile to the system.{% endif %}</p>
-        </div>
-
-        <form id="authForm" class="auth-form" data-mode="{{ mode }}">
-            {% if mode == 'signup' %}
-            <div class="input-group">
-                <label>Personnel Name</label>
-                <div class="input-wrapper">
-                    <i class="ph-bold ph-user"></i>
-                    <input type="text" id="name" placeholder="Enter full name" required>
-                </div>
-            </div>
-            {% endif %}
-
-            <div class="input-group">
-                <label>Digital ID (Email)</label>
-                <div class="input-wrapper">
-                    <i class="ph-bold ph-envelope-simple"></i>
-                    <input type="email" id="email" placeholder="name@domain.com" required>
-                </div>
+            <div class="input-group" id="nameGroup" style="display:none;">
+                <label>Full Personnel Name</label>
+                <input type="text" id="name" class="glass-input" placeholder="Enter Full Name">
             </div>
 
             <div class="input-group">
-                <label>Security Key</label>
-                <div class="input-wrapper">
-                    <i class="ph-bold ph-lock-key"></i>
-                    <input type="password" id="password" placeholder="Enter password" required>
-                </div>
+                <label>Identification Email</label>
+                <input type="email" id="email" class="glass-input" placeholder="athlete@nyxft.com">
             </div>
 
-            <button type="submit" class="btn-submit">
-                {% if mode == 'login' %}INITIALIZE UPLINK{% else %}DEPLOY IDENTITY{% endif %}
-                <i class="ph-bold ph-arrow-right"></i>
-            </button>
-        </form>
+            <div class="input-group" id="passwordGroup" style="display:none;">
+                <label>Secure Passcode</label>
+                <input type="password" id="password" class="glass-input" placeholder="••••••••">
+            </div>
 
-        <div class="divider">OR</div>
+            <div class="social-auth">
+                <button class="btn-social" onclick="window.location.href='/api/auth/google'"><i class="ph-bold ph-google-logo"></i> Google</button>
+                <button class="btn-social"><i class="ph-bold ph-apple-logo"></i> Apple</button>
+            </div>
 
-        <button type="button" class="btn-google">
-            <img src="https://www.gstatic.com/images/branding/product/1x/gsa_512dp.png" alt="G"> CONNECT VIA GOOGLE
-        </button>
+            <div class="action-track" style="margin-top: 20px; max-width: 100%;">
+                <div class="pill-handle" id="authPill" style="width: 180px;">SLIDE TO SYNC</div>
+                <div class="track-instruction">SYNC >>></div>
+            </div>
 
-        <div class="switch-mode">
-            {% if mode == 'login' %}
-            New personnel? <a href="/auth?mode=signup">Create Account</a>
-            {% else %}
-            Existing identity? <a href="/auth?mode=login">Access Portal</a>
-            {% endif %}
-        </div>
-        
-        <div style="height: 40px;"></div>
-    </div>
-
-    <!-- PIN PAD OVERLAY (Relocated for Visibility) -->
-    <div id="pinOverlay" class="pin-overlay">
-        <div class="auth-icon-badge" style="background: var(--accent-blue);"><i class="ph-fill ph-lock-key"></i></div>
-        <div class="auth-header">
-            <div class="auth-eyebrow">TACTICAL ACCESS</div>
-            <h1 class="auth-title">Enter PIN</h1>
-            <p class="auth-desc">Uplink active. Verify identity.</p>
-        </div>
-        
-        <div class="pin-dots" id="pinDots">
-            <div class="pin-dot"></div>
-            <div class="pin-dot"></div>
-            <div class="pin-dot"></div>
-            <div class="pin-dot"></div>
-        </div>
-
-        <div class="uplink-hud">
-            <div class="loading-ring" id="uplinkRing"></div>
-            <div id="uplinkStatus" style="font-size: 0.7rem; font-weight: 900; letter-spacing: 2px; color: var(--accent-blue);">INITIALIZING UPLINK...</div>
-        </div>
-
-        <div class="numpad">
-            <div class="num-btn" onclick="pressPin('1')">1</div>
-            <div class="num-btn" onclick="pressPin('2')">2</div>
-            <div class="num-btn" onclick="pressPin('3')">3</div>
-            <div class="num-btn" onclick="pressPin('4')">4</div>
-            <div class="num-btn" onclick="pressPin('5')">5</div>
-            <div class="num-btn" onclick="pressPin('6')">6</div>
-            <div class="num-btn" onclick="pressPin('7')">7</div>
-            <div class="num-btn" onclick="pressPin('8')">8</div>
-            <div class="num-btn" onclick="pressPin('9')">9</div>
-            <div class="num-btn action"></div>
-            <div class="num-btn" onclick="pressPin('0')">0</div>
-            <div class="num-btn action" onclick="pressPin('back')"><i class="ph-bold ph-backspace"></i></div>
-        </div>
-
-        <div class="switch-mode" style="margin-top: 50px;">
-            <a href="#" onclick="closePinPad()" style="color: var(--text-dim); border-bottom: 1px solid var(--text-dim);">Use Standard Login</a>
+            <p class="auth-footer" id="toggleText">New Personnel? <span onclick="toggleMode()">Create Identity</span></p>
         </div>
     </div>
 
-    <div class="secure-footer fade-in">
-        <i class="ph-fill ph-shield-check" style="color: var(--accent-blue);"></i>
-        <span class="secure-text">256-BIT ENCRYPTED ATHLETE SYSTEM</span>
-    </div>
-
-    <script src="{{ url_for('static', filename='client/js/app.js') }}"></script>
-    <script src="{{ url_for('static', filename='client/js/auth.js') }}"></script>
     <script>
-        let pinBuffer = "";
-        const PIN_LIMIT = 4;
+        let isSignup = false;
+        let isVerifying = false;
+        let pendingEmail = '';
 
-        function checkPin() {
-            const hasPin = localStorage.getItem('nyx_pin_enabled') === 'true' && localStorage.getItem('nyx_pin');
-            const main = document.querySelector('.auth-main');
-            const overlay = document.getElementById('pinOverlay');
-
-            if (hasPin) {
-                overlay.classList.add('active');
-                // Keep main hidden
-            } else {
-                main.classList.add('visible');
-            }
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            toast.innerText = msg;
+            toast.style.display = 'block';
+            setTimeout(() => toast.style.display = 'none', 3000);
         }
 
-        // EXECUTE IMMEDIATELY to prevent flash
-        checkPin();
+        function toggleMode() {
+            if (isVerifying) return;
+            isSignup = !isSignup;
+            document.getElementById('authTitle').innerText = isSignup ? "Initial Deployment" : "Personnel Link";
+            document.getElementById('authSub').innerText = isSignup ? "CREATE IDENTITY // JOIN NYX" : "ENTER EMAIL // SYNC UPLINK";
+            document.getElementById('authPill').innerText = isSignup ? "BEGIN ENROLLMENT" : "SLIDE TO SYNC";
+            document.getElementById('nameGroup').style.display = isSignup ? "flex" : "none";
+            document.getElementById('passwordGroup').style.display = isSignup ? "flex" : "none";
+            document.getElementById('toggleText').innerHTML = isSignup ? 
+                "Already Linked? <span onclick='toggleMode()'>Access Portal</span>" : 
+                "New Personnel? <span onclick='toggleMode()'>Create Identity</span>";
+        }
 
-        function pressPin(key) {
-            if (key === 'back') {
-                pinBuffer = pinBuffer.slice(0, -1);
-            } else if (pinBuffer.length < PIN_LIMIT) {
-                pinBuffer += key;
-            }
+        function showVerificationState(email) {
+            isVerifying = true;
+            pendingEmail = email;
             
-            updateDots();
-            if (pinBuffer.length === PIN_LIMIT) verify();
-        }
+            // Hide all input groups
+            document.getElementById('nameGroup').style.display = 'none';
+            document.getElementById('passwordGroup').style.display = 'none';
+            document.querySelectorAll('.input-group').forEach(group => {
+                if(group.id !== 'verifyGroup') group.style.display = 'none';
+            });
+            document.querySelector('.social-auth').style.display = 'none';
+            document.getElementById('toggleText').style.display = 'none';
 
-        function updateDots() {
-            const dots = document.querySelectorAll('.pin-dot');
-            dots.forEach((d, i) => d.classList.toggle('filled', i < pinBuffer.length));
-        }
-
-        function verify() {
-            const saved = localStorage.getItem('nyx_pin');
-            if (pinBuffer === saved) {
-                const overlay = document.getElementById('pinOverlay');
-                overlay.classList.add('authorized');
-                
-                setTimeout(() => {
-                    document.getElementById('uplinkRing').classList.add('complete');
-                    document.getElementById('uplinkRing').innerHTML = '<i class="ph-bold ph-check"></i>';
-                    document.getElementById('uplinkStatus').innerText = "IDENTITY VERIFIED";
-                    document.getElementById('uplinkStatus').style.color = "#000";
+            // Create verification group with Native Numpad Trigger
+            if (!document.getElementById('verifyGroup')) {
+                const authCard = document.querySelector('.auth-card');
+                const verifyGroup = document.createElement('div');
+                verifyGroup.className = 'input-group';
+                verifyGroup.id = 'verifyGroup';
+                verifyGroup.innerHTML = `
+                    <label>Identity Verification Pulse</label>
+                    <input type="text" id="pulseCode" class="glass-input" 
+                           placeholder="000000" 
+                           inputmode="numeric" 
+                           pattern="[0-9]*" 
+                           maxlength="6" 
+                           style="text-align: center; letter-spacing: 12px; font-size: 2rem; font-weight: 800; margin-top: 20px;">
                     
-                    setTimeout(() => {
-                        overlay.style.opacity = '0';
-                        window.location.href = '/dashboard';
-                    }, 600);
-                }, 800);
-            } else {
-                const overlay = document.getElementById('pinOverlay');
-                overlay.classList.add('shake');
-                setTimeout(() => {
-                    overlay.classList.remove('shake');
-                    pinBuffer = "";
-                    updateDots();
-                }, 400);
+                    <p style="font-size: 0.65rem; color: var(--text-dim); margin-top: 30px; text-align: center; font-weight: 700;">ENTER THE 6-DIGIT CODE SENT TO:<br><span style="color: #000;">${email}</span></p>
+                `;
+                const actionTrack = document.querySelector('.action-track');
+                authCard.insertBefore(verifyGroup, actionTrack);
+                
+                // Auto-focus the input
+                setTimeout(() => document.getElementById('pulseCode').focus(), 400);
             }
+
+            document.getElementById('authTitle').innerText = "Security Pulse";
+            document.getElementById('authSub').innerText = "VERIFY IDENTITY // UPLINK ACTIVE";
+            document.getElementById('authPill').innerText = "CONFIRM CODE";
         }
 
-        function closePinPad() {
-            document.getElementById('pinOverlay').classList.remove('active');
-            document.querySelector('.auth-main').classList.add('visible');
+        async function processAuth() {
+            if (isVerifying) {
+                return verifyPulse();
+            }
+
+            const email = document.getElementById('email').value.trim();
+            const password = isSignup ? document.getElementById('password').value.trim() : 'NOT_REQUIRED';
+            const name = isSignup ? document.getElementById('name').value.trim() : 'NOT_REQUIRED';
+
+            if (!email || (isSignup && (!password || !name))) {
+                return showToast('DATA FIELDS INCOMPLETE');
+            }
+
+            try {
+                const res = await fetch('/api/auth', {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                    },
+                    body: JSON.stringify({ 
+                        action: isSignup ? 'signup' : 'login',
+                        email, password, name
+                    })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    if (data.requires_verification) {
+                        showToast('SECURITY PULSE SENT');
+                        showVerificationState(email);
+                    } else if (data.redirect) {
+                        window.location.href = data.redirect;
+                    }
+                } else {
+                    if (!isSignup && res.status === 404) {
+                        showToast('IDENTITY NOT FOUND. INITIALIZING ENROLLMENT.');
+                        setTimeout(() => toggleMode(), 500);
+                    } else {
+                        showToast(data.error || 'AUTHENTICATION REJECTED');
+                    }
+                }
+            } catch (e) { showToast('UPLINK CONNECTION FAILED'); }
         }
 
-        // window.onload = checkPin; // Removed to prevent delay
+        async function verifyPulse() {
+            const code = document.getElementById('pulseCode').value.trim();
+            if (code.length !== 6) return showToast('INVALID PULSE FORMAT');
+
+            try {
+                const res = await fetch('/api/auth/verify', {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                    },
+                    body: JSON.stringify({ 
+                        email: pendingEmail,
+                        code: code
+                    })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast('IDENTITY VERIFIED // REDIRECTING');
+                    setTimeout(() => window.location.href = data.redirect || '/dashboard', 300);
+                } else {
+                    showToast(data.error || 'INVALID PULSE CODE');
+                    // Shake the input
+                    document.getElementById('pulseCode').style.borderColor = 'var(--error-red)';
+                    setTimeout(() => document.getElementById('pulseCode').style.borderColor = '', 1000);
+                }
+            } catch (e) { showToast('SIGNAL INTERRUPTED'); }
+        }
+
+        function initSlider() {
+            const track = document.querySelector('.action-track');
+            const pill = document.querySelector('.pill-handle');
+            const instruct = document.querySelector('.track-instruction');
+            let isDragging = false;
+            let startX = 0;
+            
+            // Re-calculate maxSlide dynamically in case of window resizing
+            const getMaxSlide = () => track.offsetWidth - pill.offsetWidth - 12;
+
+            const onStart = (e) => {
+                isDragging = true;
+                startX = e.type === 'touchstart' ? e.touches[0].clientX : e.clientX;
+                pill.style.transition = 'none';
+            };
+
+            const onMove = (e) => {
+                if (!isDragging) return;
+                const x = e.type === 'touchmove' ? e.touches[0].clientX : e.clientX;
+                let delta = x - startX;
+                const maxSlide = getMaxSlide();
+                delta = Math.max(0, Math.min(delta, maxSlide));
+                pill.style.transform = `translateX(${delta}px)`;
+                instruct.style.opacity = 1 - (delta / maxSlide);
+            };
+
+            const onEnd = () => {
+                if (!isDragging) return;
+                isDragging = false;
+                pill.style.transition = 'transform 0.4s cubic-bezier(0.16, 1, 0.3, 1)';
+                const currentPos = parseInt(pill.style.transform.replace('translateX(', '').replace('px)', '')) || 0;
+                const maxSlide = getMaxSlide();
+
+                if (currentPos > maxSlide * 0.8) {
+                    pill.style.transform = `translateX(${maxSlide}px)`;
+                    processAuth();
+                    setTimeout(() => {
+                        pill.style.transform = 'translateX(0)';
+                        instruct.style.opacity = '1';
+                    }, 1000);
+                } else {
+                    pill.style.transform = 'translateX(0)';
+                    instruct.style.opacity = '1';
+                }
+            };
+
+            pill.addEventListener('mousedown', onStart);
+            pill.addEventListener('touchstart', onStart);
+            window.addEventListener('mousemove', onMove);
+            window.addEventListener('touchmove', onMove);
+            window.addEventListener('mouseup', onEnd);
+            window.addEventListener('touchend', onEnd);
+        }
+
+        window.onload = () => {
+            initSlider();
+            const params = new URLSearchParams(window.location.search);
+            if (params.get('mode') === 'signup') {
+                toggleMode();
+            }
+
+            // Splash Transition Lifecycle (ALWAYS plays on /auth)
+            setTimeout(() => {
+                const splash = document.getElementById('splashScreen');
+                const card = document.querySelector('.auth-card');
+                
+                splash.classList.add('splash-out');
+                card.classList.add('auth-in');
+                
+                setTimeout(() => splash.remove(), 500);
+            }, 2000); 
+        };
     </script>
 </body>
 </html>

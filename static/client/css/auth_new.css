@@ -1,0 +1,249 @@
+:root {
+    --bg-white: #FFFFFF;
+    --grid-color: rgba(0, 0, 0, 0.05);
+    --grid-size: 40px;
+    --accent-black: #000000;
+    --text-primary: #000000;
+    --text-secondary: #666666;
+    --border-main: #000000;
+    --error-red: #FF3B30;
+    --radius-none: 0px; /* Minimalist aesthetic often uses sharp or very subtle radii */
+    --radius-sm: 4px;
+    --radius-md: 8px;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Outfit', sans-serif;
+}
+
+body {
+    background-color: var(--bg-white);
+    color: var(--text-primary);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    position: relative;
+}
+
+/* ── SUBTLE ARCHITECTURAL GRID ── */
+body::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-image: 
+        linear-gradient(var(--grid-color) 1px, transparent 1px),
+        linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
+    background-size: var(--grid-size) var(--grid-size);
+    z-index: 0;
+    pointer-events: none;
+}
+
+/* ── AUTH CONTAINER ── */
+.auth-container {
+    width: 100%;
+    max-width: 420px;
+    padding: 20px;
+    z-index: 10;
+}
+
+.auth-card {
+    background: var(--bg-white);
+    border: 3px solid var(--accent-black);
+    padding: 50px 40px;
+    box-shadow: 15px 15px 0 var(--accent-black);
+    position: relative;
+    animation: slideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes slideIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* ── HEADER ── */
+.auth-header {
+    text-align: center;
+    margin-bottom: 40px;
+}
+
+.auth-logo {
+    font-size: 3rem;
+    font-weight: 950;
+    letter-spacing: -3px;
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    color: var(--accent-black);
+}
+
+.auth-logo span {
+    color: var(--accent-black);
+}
+
+.auth-subtitle {
+    font-size: 0.8rem;
+    font-weight: 900;
+    color: var(--text-primary);
+    text-transform: uppercase;
+    letter-spacing: 4px;
+    opacity: 0.5;
+}
+
+/* ── FORM ELEMENTS ── */
+.form-group {
+    margin-bottom: 25px;
+}
+
+.form-label {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 900;
+    color: var(--text-primary);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 10px;
+}
+
+.form-input {
+    width: 100%;
+    background: #F8F8F8;
+    border: 2px solid var(--accent-black);
+    padding: 16px;
+    color: var(--text-primary);
+    font-size: 1rem;
+    font-weight: 700;
+    outline: none;
+    transition: all 0.2s ease;
+}
+
+.form-input:focus {
+    background: #FFFFFF;
+    box-shadow: 5px 5px 0 var(--accent-black);
+}
+
+/* ── BUTTONS ── */
+.btn-primary {
+    width: 100%;
+    background: var(--accent-black);
+    color: #FFF;
+    border: 2px solid var(--accent-black);
+    padding: 20px;
+    font-size: 1rem;
+    font-weight: 900;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+}
+
+.btn-primary:hover {
+    background: #FFF;
+    color: var(--accent-black);
+}
+
+.btn-google {
+    width: 100%;
+    background: #FFF;
+    color: var(--accent-black);
+    border: 2px solid var(--accent-black);
+    padding: 16px;
+    font-size: 0.95rem;
+    font-weight: 900;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin-bottom: 30px;
+    transition: all 0.2s ease;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.btn-google:hover {
+    background: var(--accent-black);
+    color: #FFF;
+}
+
+.btn-google img {
+    width: 20px;
+    height: 20px;
+    filter: grayscale(1); /* Matches the minimalist aesthetic */
+}
+
+.btn-google:hover img {
+    filter: grayscale(0) brightness(2);
+}
+
+/* ── DIVIDER ── */
+.divider {
+    display: flex;
+    align-items: center;
+    text-align: center;
+    margin: 30px 0;
+    color: var(--text-primary);
+    font-size: 0.75rem;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    opacity: 0.4;
+}
+
+.divider::before, .divider::after {
+    content: '';
+    flex: 1;
+    border-bottom: 2px solid var(--accent-black);
+    opacity: 0.2;
+}
+
+.divider:not(:empty)::before { margin-right: 20px; }
+.divider:not(:empty)::after { margin-left: 20px; }
+
+/* ── FOOTER LINKS ── */
+.auth-footer {
+    text-align: center;
+    margin-top: 30px;
+}
+
+.auth-link {
+    color: var(--accent-black);
+    text-decoration: underline;
+    font-weight: 900;
+    font-size: 0.85rem;
+    cursor: pointer;
+    text-transform: uppercase;
+}
+
+.auth-link:hover {
+    opacity: 0.7;
+}
+
+/* ── STATE MANAGEMENT ── */
+.state-hidden {
+    display: none;
+}
+
+/* ── TOAST ── */
+.toast {
+    position: fixed;
+    top: 40px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--accent-black);
+    color: white;
+    padding: 15px 30px;
+    border: 2px solid white;
+    font-weight: 900;
+    font-size: 0.9rem;
+    z-index: 1000;
+    display: none;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}

@@ -2,7 +2,7 @@
     "name": "NYX Performance OS",
     "short_name": "NYXft",
     "description": "Next-generation tactical training and performance engineering ecosystem.",
-    "start_url": "/dashboard",
+    "start_url": "/auth",
     "display": "standalone",
     "background_color": "#ffffff",
     "theme_color": "#000000",

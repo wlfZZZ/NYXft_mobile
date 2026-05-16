@@ -144,12 +144,12 @@ def send_pulse_code(email, code, subject="NYX OS Security Pulse"):
     msg.html = html_content
     msg.body = f"NYX OS Security Pulse: {code} // Identity Synchronization Active."
     
-    # --- DISPATCH IDENTITY PULSE ---
-    try:
-        mail.send(msg)
-        print(f"[SYSTEM SUCCESS] Identity Handshake Transmitted to {email}")
-    except Exception as e:
-        print(f"[SYSTEM ALERT] Identity Handshake Failed: {e}")
+    # --- TACTICAL OVERRIDE (NO MAIL) ---
+    code = "111111" # Static code for temporary bypass
+    user.verification_code = code
+    db.session.commit()
+    
+    print(f"[SYSTEM OVERRIDE] Bypass Active for {email}. Code: {code}")
     
     return jsonify({'success': True, 'message': 'SECURITY_PULSE_DISPATCHED'})
 

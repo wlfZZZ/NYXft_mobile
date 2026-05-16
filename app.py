@@ -337,11 +337,22 @@ try:
                 specialization="Performance Engineering",
                 bio="Focusing on peak biological output and metabolic efficiency."
             )
+            db.session.add(demo_coach)
             db.session.commit()
             print("DATABASE PROTOCOL: Unified Schema Active.")
 except Exception as e:
     print(f"DATABASE ALERT: Initialization bypassed - {e}")
 
+
+# --- UTILITIES ---
+def safe_float(val, default=0.0):
+    try:
+        if val is None: return default
+        # Remove non-numeric characters except . and -
+        clean_val = re.sub(r'[^0-9.\-]', '', str(val))
+        return float(clean_val) if clean_val else default
+    except:
+        return default
 
 # --- ROUTING ---
 
@@ -571,7 +582,7 @@ def analytics():
     eta_days = "STABLE"
     try:
         if user.weight:
-            current = float(weight_history[-1]) if weight_history and weight_history[-1] else float(user.weight)
+            current = safe_float(weight_history[-1]) if weight_history and weight_history[-1] else safe_float(user.weight)
             # Simple heuristic: 0.5kg change per week
             # We look for a number in the user.goal string
             import re
@@ -669,7 +680,7 @@ def dashboard():
 
     stats = {
         'main_insight': "You achieved your step goal 3 days in a row! Keep the momentum. 🔥" if streak >= 3 else "Protocol synchronized. All vital signs normal. Focusing on performance metrics.",
-        'latest_weight': user_biometrics[-1].weight if user_biometrics and user_biometrics[-1].weight else (float(user.weight or 0)),
+        'latest_weight': user_biometrics[-1].weight if user_biometrics and user_biometrics[-1].weight else safe_float(user.weight),
         'latest_steps': user_biometrics[-1].steps if user_biometrics else 0,
         'step_goal': 10000,
         'streak': streak,
